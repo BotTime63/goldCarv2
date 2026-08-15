@@ -5,12 +5,10 @@ const GITHUB_CONFIG = {
     owner: "BotTime63",
     repo: "goldCarv2",
     branch: "main",
-    // Split your token into two halves here to bypass GitHub's scanner:
     tokenPart1: "PASTE_FIRST_HALF_HERE",
     tokenPart2: "PASTE_SECOND_HALF_HERE"
 };
 
-// Automatically combines your split token for requests
 function getGitHubToken() {
     return (GITHUB_CONFIG.tokenPart1 + GITHUB_CONFIG.tokenPart2).trim();
 }
@@ -50,16 +48,24 @@ let recentHistory = [];
 const STORAGE = {
     heartMode: "mediaViewerHeartMode",
     swipeMode: "mediaViewerSwipeMode",
-    visited: "mediaViewerVisited"
+    visited: "mediaViewerVisited",
+    heartsLocal: "mediaViewerLocalHearts",
+    seenLocal: "mediaViewerLocalSeen"
 };
 
-let seenItems = new Set();
-let heartedItems = new Set();
+// Load initial state instantly from localStorage for maximum speed
+let seenItems = new Set(JSON.parse(localStorage.getItem(STORAGE.seenLocal) || "[]"));
+let heartedItems = new Set(JSON.parse(localStorage.getItem(STORAGE.heartsLocal) || "[]"));
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
+// Sync flags for debouncing
+let heartsDirty = false;
+let seenDirty = false;
+let syncTimeout = null;
+
 /* ==========================================================
-   GITHUB API SAVE & LOAD FUNCTIONS
+   OPTIMIZED GITHUB API BATCH SAVE & LOAD
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
@@ -68,10 +74,7 @@ async function fetchGitHubFile(path) {
         const res = await fetch(url, {
             headers: { Authorization: `token ${token}` }
         });
-        if(!res.ok) {
-            console.error(`GitHub API Load Error for ${path}:`, res.status, res.statusText);
-            return null;
-        }
+        if(!res.ok) return null;
         const data = await res.json();
         const content = JSON.parse(atob(data.content.replace(/\s/g, '')));
         return { content, sha: data.sha };
@@ -81,64 +84,115 @@ async function fetchGitHubFile(path) {
     }
 }
 
-async function saveGitHubFile(path, dataArray) {
+async function saveGitHubFileDirect(path, dataArray, useKeepalive = false) {
     try {
         const token = getGitHubToken();
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
         
         const existing = await fetchGitHubFile(path);
         const sha = existing ? existing.sha : undefined;
-
         const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(dataArray, null, 2))));
 
         const body = {
-            message: `Update ${path} from Mobile Viewer`,
+            message: `Batch update ${path} from Mobile Viewer`,
             content: contentBase64,
             branch: GITHUB_CONFIG.branch
         };
         if(sha) body.sha = sha;
 
-        const res = await fetch(url, {
+        const options = {
             method: "PUT",
             headers: {
                 "Authorization": `token ${token}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(body)
-        });
+        };
 
+        if(useKeepalive) options.keepalive = true;
+
+        const res = await fetch(url, options);
         if(!res.ok) {
-            const errText = await res.text();
-            console.error(`GitHub API Save Error for ${path} (${res.status}):`, errText);
+            console.error(`GitHub API Save Error for ${path} (${res.status})`);
         } else {
-            console.log(`Successfully saved ${path} to GitHub.`);
+            console.log(`Successfully synced ${path} to GitHub.`);
         }
     } catch(error) {
-        console.error(`Failed to save ${path} to GitHub exception:`, error);
+        console.error(`Failed to save ${path} to GitHub:`, error);
     }
-    updateStatsDashboard();
 }
 
+// Debounced Sync Trigger (Runs 3 seconds after last change)
+function triggerSync() {
+    // Always persist instantly to local storage first
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
+    updateStatsDashboard();
+
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(async () => {
+        if (heartsDirty) {
+            await saveGitHubFileDirect("saved_hearts.json", [...heartedItems]);
+            heartsDirty = false;
+        }
+        if (seenDirty) {
+            await saveGitHubFileDirect("seen_media.json", [...seenItems]);
+            seenDirty = false;
+        }
+    }, 3000);
+}
+
+// Force immediate flush when leaving or switching apps
+function flushChanges(useKeepalive = false) {
+    if (syncTimeout) clearTimeout(syncTimeout);
+    
+    // Save to localStorage immediately
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
+
+    if (heartsDirty) {
+        saveGitHubFileDirect("saved_hearts.json", [...heartedItems], useKeepalive);
+        heartsDirty = false;
+    }
+    if (seenDirty) {
+        saveGitHubFileDirect("seen_media.json", [...seenItems], useKeepalive);
+        seenDirty = false;
+    }
+}
+
+// Bind lifecycle events for mobile/desktop switching and closing
+window.addEventListener("beforeunload", () => flushChanges(true));
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        flushChanges(true);
+    }
+});
+
 async function loadServerData(){
+    // Merge server data with local cache (Union of both for safety)
     const heartsRes = await fetchGitHubFile("saved_hearts.json");
     if(heartsRes && Array.isArray(heartsRes.content)) {
-        heartedItems = new Set(heartsRes.content);
+        heartsRes.content.forEach(id => heartedItems.add(id));
     }
 
     const seenRes = await fetchGitHubFile("seen_media.json");
     if(seenRes && Array.isArray(seenRes.content)) {
-        seenItems = new Set(seenRes.content);
+        seenRes.content.forEach(id => seenItems.add(id));
     }
 
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
     updateStatsDashboard();
 }
 
-async function saveHearts(){
-    await saveGitHubFile("saved_hearts.json", [...heartedItems]);
+function saveHearts(){
+    heartsDirty = true;
+    triggerSync();
 }
 
-async function saveSeen(){
-    await saveGitHubFile("seen_media.json", [...seenItems]);
+function saveSeen(){
+    seenDirty = true;
+    triggerSync();
 }
 
 function saveSettings(){
@@ -174,8 +228,10 @@ function showWelcome(){
     const visited = localStorage.getItem(STORAGE.visited);
     if(!visited){
         const banner = document.getElementById("welcomeBanner");
-        banner.style.display = "block";
-        setTimeout(() => { banner.style.display = "none"; }, 5000);
+        if(banner) {
+            banner.style.display = "block";
+            setTimeout(() => { banner.style.display = "none"; }, 5000);
+        }
         localStorage.setItem(STORAGE.visited, "true");
     }
 }
@@ -249,7 +305,10 @@ function debouncedSearch(){
     searchTimer = setTimeout(applySearch, SEARCH_DELAY);
 }
 
-document.getElementById("searchInput").addEventListener("input", debouncedSearch);
+const searchInput = document.getElementById("searchInput");
+if(searchInput) {
+    searchInput.addEventListener("input", debouncedSearch);
+}
 
 /* ==========================================================
    HEART SYSTEM & DOUBLE TAP
@@ -320,15 +379,17 @@ function addToHistory(item){
 
 function toggleHistoryModal(){
     const modal = document.getElementById("historyModal");
-    modal.classList.toggle("hidden");
-
-    if(!modal.classList.contains("hidden")){
-        renderHistoryList();
+    if(modal) {
+        modal.classList.toggle("hidden");
+        if(!modal.classList.contains("hidden")){
+            renderHistoryList();
+        }
     }
 }
 
 function renderHistoryList(){
     const container = document.getElementById("historyListContainer");
+    if(!container) return;
     if(recentHistory.length === 0){
         container.innerHTML = '<p style="color:#777; text-align:center;">No recent history yet.</p>';
         return;
@@ -382,7 +443,8 @@ function clearHearts(){
 ========================================================== */
 function buildDisplayList(){
     let list = [...mediaUrls];
-    const query = document.getElementById("searchInput").value.toLowerCase().trim();
+    const queryElement = document.getElementById("searchInput");
+    const query = queryElement ? queryElement.value.toLowerCase().trim() : "";
 
     if(query){
         const number = query.replace("#","");
@@ -443,8 +505,10 @@ function renderControls(){
         <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
         <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
     `;
-    document.getElementById("topControls").innerHTML = html;
-    document.getElementById("bottomControls").innerHTML = html;
+    const topCtrl = document.getElementById("topControls");
+    const botCtrl = document.getElementById("bottomControls");
+    if(topCtrl) topCtrl.innerHTML = html;
+    if(botCtrl) botCtrl.innerHTML = html;
 }
 
 function render(){
@@ -452,8 +516,10 @@ function render(){
     updateStatsDashboard();
 
     const container = document.getElementById("mediaContainer");
+    const statusEl = document.getElementById("status");
+    if(!container) return;
     container.innerHTML = "";
-    document.getElementById("status").textContent = "";
+    if(statusEl) statusEl.textContent = "";
 
     const pageSize = swipeMode ? 1 : 15;
     let shown = 0;
@@ -540,12 +606,13 @@ function render(){
 ========================================================== */
 function nextRandomPage(){
     snapToTop();
+    const statusEl = document.getElementById("status");
 
     if(heartMode){
         if(currentIndex >= workingList.length){
             shuffleArray(workingList);
             currentIndex = 0;
-            document.getElementById("status").textContent = "❤️ All hearts viewed! Reshuffling hearts.";
+            if(statusEl) statusEl.textContent = "❤️ All hearts viewed! Reshuffling hearts.";
         }
     } else {
         workingList = buildDisplayList();
@@ -557,7 +624,7 @@ function nextRandomPage(){
             saveSeen();
             workingList = buildDisplayList();
             shuffleArray(workingList);
-            document.getElementById("status").textContent = "🎉 Cycle complete. Starting again.";
+            if(statusEl) statusEl.textContent = "🎉 Cycle complete. Starting again.";
         }
     }
 
@@ -584,6 +651,7 @@ async function initializeApp(){
         currentIndex = 0;
         render();
     } catch(error) {
-        document.getElementById("status").textContent = "Error: " + error.message;
+        const statusEl = document.getElementById("status");
+        if(statusEl) statusEl.textContent = "Error: " + error.message;
     }
 }
