@@ -4,9 +4,20 @@
 const GITHUB_CONFIG = {
     owner: "BotTime63",
     repo: "goldCarv2",
-    token: "ghp_ptl5wU4wFd8Zqiq4H9QK-BUYdb5DNgc20aHHi",
     branch: "main"
 };
+
+// Automatically manages your token securely in browser storage
+function getGitHubToken() {
+    let token = localStorage.getItem("github_token");
+    if (!token || token === "YOUR_GITHUB_TOKEN") {
+        token = prompt("Enter your GitHub Personal Access Token (stored safely in your browser):");
+        if (token) {
+            localStorage.setItem("github_token", token.trim());
+        }
+    }
+    return token ? token.trim() : "";
+}
 
 /* ==========================================================
    LOGIN SYSTEM
@@ -52,20 +63,20 @@ let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
 /* ==========================================================
-   GITHUB API SAVE & LOAD FUNCTIONS (WITH ERROR LOGGING)
+   GITHUB API SAVE & LOAD FUNCTIONS
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
+        const token = getGitHubToken();
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
         const res = await fetch(url, {
-            headers: { Authorization: `token ${GITHUB_CONFIG.token}` }
+            headers: { Authorization: `token ${token}` }
         });
         if(!res.ok) {
             console.error(`GitHub API Load Error for ${path}:`, res.status, res.statusText);
             return null;
         }
         const data = await res.json();
-        // Clean any whitespace in base64 string
         const content = JSON.parse(atob(data.content.replace(/\s/g, '')));
         return { content, sha: data.sha };
     } catch(e) {
@@ -76,12 +87,12 @@ async function fetchGitHubFile(path) {
 
 async function saveGitHubFile(path, dataArray) {
     try {
+        const token = getGitHubToken();
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
         
         const existing = await fetchGitHubFile(path);
         const sha = existing ? existing.sha : undefined;
 
-        // Safe base64 encoding
         const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(dataArray, null, 2))));
 
         const body = {
@@ -94,7 +105,7 @@ async function saveGitHubFile(path, dataArray) {
         const res = await fetch(url, {
             method: "PUT",
             headers: {
-                "Authorization": `token ${GITHUB_CONFIG.token}`,
+                "Authorization": `token ${token}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(body)
