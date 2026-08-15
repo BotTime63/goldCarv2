@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="referrer" content="no-referrer">
+
+<!-- PWA / iOS App Mode Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Media Viewer">
+
+<title>Media Viewer V4</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    overscroll-behavior-y: none;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background: #000;
+    color: #e0e0e0;
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+h1 {
+    margin: 15px 0 10px;
+    font-size: 26px;
+    font-weight: bold;
+}
+
+a {
+    color: #00AAFF;
+}
+
+img, video {
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+/* Media */
+.media-container {
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 0 0 15px;
+    position: relative;
+}
+
+.media-container img,
+.media-container video {
+    width: auto;
+    max-width: 100vw;
+    max-height: 75vh;
+    height: auto;
+    object-fit: contain;
+    background: #000;
+    display: block;
+    touch-action: pan-x pan-y pinch-zoom;
+    cursor: pointer;
+}
+
+.media-number {
+    margin: 6px 0 4px;
+    font-size: 12px;
+    opacity: .55;
+}
+
+.media-container a {
+    width: 95%;
+    margin: 6px 0 10px;
+    font-size: 11px;
+    word-break: break-all;
+    text-decoration: none;
+}
+
+/* Heart */
+.heart-btn {
+    border: none;
+    background: transparent;
+    color: #fff;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    margin: 5px 0;
+    transition: transform .15s ease;
+}
+
+.heart-btn:hover {
+    transform: scale(1.15);
+}
+
+.heart-btn.active {
+    color: #ff2d55;
+}
+
+/* Floating Double-Tap Heart Animation */
+.floating-heart {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 90px;
+    color: #ff2d55;
+    pointer-events: none;
+    z-index: 50;
+    animation: popHeart 0.6s ease-out forwards;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6));
+}
+
+@keyframes popHeart {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    60% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+}
+
+/* Search */
+#searchInput {
+    width: 90%;
+    max-width: 450px;
+    margin: 5px auto 10px;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
+}
+
+/* Stats Dashboard */
+.stats-dashboard {
+    display: flex;
+    justify-content: space-around;
+    background: #121212;
+    border: 1px solid #222;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 450px;
+    margin: 0 auto 15px;
+    padding: 10px 5px;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-size: 13px;
+    font-weight: bold;
+    color: #fff;
+}
+
+/* Buttons */
+button {
+    padding: 9px 14px;
+    margin: 3px;
+    font-size: 12px;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    color: #fff;
+    background: #4CAF50;
+    transition: background .15s ease;
+}
+
+button:hover {
+    background: #45A049;
+}
+
+.random-btn {
+    background: #8e44ad;
+}
+.heart-mode-btn {
+    background: #e91e63;
+}
+.swipe-mode-btn {
+    background: #2980b9;
+}
+.history-btn {
+    background: #34495e;
+}
+
+/* Swipe Mode Action Bar */
+.swipe-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px 0 20px;
+}
+.swipe-action-btn {
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 8px;
+}
+
+/* History Modal */
+#historyModal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 9500;
+    padding: 20px;
+    overflow-y: auto;
+    text-align: left;
+}
+.history-item {
+    display: flex;
+    align-items: center;
+    background: #151515;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid #222;
+    cursor: pointer;
+}
+.history-item:hover {
+    background: #222;
+}
+.history-thumb {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 12px;
+    background: #000;
+}
+
+/* Safe Footer Clear Button */
+.footer-container {
+    margin: 40px 0 60px;
+    padding-top: 20px;
+    border-top: 1px solid #222;
+}
+
+.clear-btn {
+    background: transparent;
+    color: #666;
+    border: 1px dashed #444;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.clear-btn:hover {
+    opacity: 1;
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.05);
+}
+
+/* Controls */
+.controls {
+    width: 100%;
+    text-align: center;
+}
+
+#topControls { margin-top: 5px; }
+#bottomControls { padding-bottom: 10px; }
+
+/* Status */
+#status {
+    color: #ff6666;
+    font-size: 14px;
+    margin: 10px;
+    min-height: 20px;
+}
+
+/* Welcome */
+#welcomeBanner {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 450px;
+    background: #222;
+    color: #fff;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(255, 255, 255, .15);
+    display: none;
+    z-index: 9000;
+}
+
+/* Login */
+#loginScreen {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+#loginBox {
+    background: #1f1f1f;
+    padding: 25px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 360px;
+}
+
+#passwordInput {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 6px;
+    outline: none;
+}
+
+#app { display: none; }
+.hidden { display: none !important; }
+</style>
+</head>
+
+<body>
+
+<div id="welcomeBanner">
+    ✅ Tracking enabled.<br><br>
+    You will not see the same media twice<br>
+    on this device.
+</div>
+
+<!-- History Modal -->
+<div id="historyModal" class="hidden">
+    <div style="max-width:450px; margin:0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
+            <h3 style="margin:0;">🕒 Recently Viewed History</h3>
+            <button onclick="toggleHistoryModal()" style="background:#c0392b; padding:6px 12px;">Close ✕</button>
+        </div>
+        <div id="historyListContainer"></div>
+    </div>
+</div>
+
+<div id="loginScreen">
+    <div id="loginBox">
+        <h2>Enter Password</h2>
+
+        <input
+            id="passwordInput"
+            type="password"
+            placeholder="Password"
+        >
+
+        <br><br>
+
+        <button id="loginButton">Enter</button>
+
+        <div id="loginError" style="color:red;margin-top:10px;"></div>
+    </div>
+</div>
+
+<div id="app">
+    <h1>Media Viewer V4</h1>
+
+    <input
+        id="searchInput"
+        type="text"
+        placeholder="Search by URL or number..."
+    >
+
+    <div id="statsDashboard" class="stats-dashboard">
+        <div class="stat-item">
+            <span class="stat-label">Progress</span>
+            <span id="statProgress" class="stat-value">0%</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Seen</span>
+            <span id="statSeen" class="stat-value">0 / 0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Hearts</span>
+            <span id="statHearts" class="stat-value">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Remaining</span>
+            <span id="statRemaining" class="stat-value">0</span>
+        </div>
+    </div>
+
+    <div id="topControls" class="controls"></div>
+
+    <div id="status"></div>
+
+    <div id="mediaContainer"></div>
+
+    <div id="bottomControls" class="controls"></div>
+
+    <div class="footer-container">
+        <button class="clear-btn" onclick="clearHearts()">🗑 Clear All History & Hearts</button>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
