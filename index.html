@@ -1,20 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <meta name="referrer" content="no-referrer">
-<title>Media Viewer V3</title>
+
+<!-- PWA / iOS App Mode Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Media Viewer">
+
+<title>Media Viewer V4 - GitHub Sync</title>
 
 <style>
-*{
+* {
     box-sizing: border-box;
 }
-html{
+
+html {
     scroll-behavior: smooth;
+    overscroll-behavior-y: none;
 }
-body{
+
+body {
     margin: 0;
     padding: 0;
     overflow-x: hidden;
@@ -23,48 +32,55 @@ body{
     font-family: Arial, Helvetica, sans-serif;
     text-align: center;
     user-select: none;
+    -webkit-touch-callout: none;
 }
-h1{
-    margin: 15px 0;
-    font-size: 28px;
+
+h1 {
+    margin: 15px 0 10px;
+    font-size: 26px;
     font-weight: bold;
 }
-a{
+
+a {
     color: #00AAFF;
 }
-img{
+
+img, video {
     -webkit-user-drag: none;
     user-select: none;
 }
 
-/* ==========================================================
-   MEDIA DISPLAY
-========================================================== */
-.media-container{
+/* Media */
+.media-container {
     width: 100vw;
     display: flex;
     flex-direction: column;
     align-items: center;
     margin: 0;
-    padding: 0 0 15px 0;
+    padding: 0 0 15px;
+    position: relative;
 }
+
 .media-container img,
-.media-container video{
+.media-container video {
     width: auto;
     max-width: 100vw;
-    max-height: 85vh;
+    max-height: 75vh;
     height: auto;
     object-fit: contain;
     background: #000;
     display: block;
     touch-action: pan-x pan-y pinch-zoom;
+    cursor: pointer;
 }
-.media-number{
+
+.media-number {
     margin: 6px 0 4px;
     font-size: 12px;
     opacity: .55;
 }
-.media-container a{
+
+.media-container a {
     width: 95%;
     margin: 6px 0 10px;
     font-size: 11px;
@@ -72,33 +88,52 @@ img{
     text-decoration: none;
 }
 
-/* ==========================================================
-   HEART BUTTON
-========================================================== */
-.heart-btn{
+/* Heart */
+.heart-btn {
     border: none;
     background: transparent;
-    color: #ffffff;
+    color: #fff;
     font-size: 28px;
     cursor: pointer;
     padding: 0;
     margin: 5px 0;
     transition: transform .15s ease;
 }
-.heart-btn:hover{
+
+.heart-btn:hover {
     transform: scale(1.15);
 }
-.heart-btn.active{
+
+.heart-btn.active {
     color: #ff2d55;
 }
 
-/* ==========================================================
-   SEARCH
-========================================================== */
-#searchInput{
+/* Floating Double-Tap Heart Animation */
+.floating-heart {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 90px;
+    color: #ff2d55;
+    pointer-events: none;
+    z-index: 50;
+    animation: popHeart 0.6s ease-out forwards;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6));
+}
+
+@keyframes popHeart {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    60% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+}
+
+/* Search */
+#searchInput {
     width: 90%;
     max-width: 450px;
-    margin: 10px auto;
+    margin: 5px auto 10px;
     padding: 10px;
     font-size: 16px;
     border: none;
@@ -106,13 +141,45 @@ img{
     outline: none;
 }
 
-/* ==========================================================
-   BUTTONS
-========================================================== */
-button{
-    padding: 10px 18px;
-    margin: 5px;
-    font-size: 14px;
+/* Stats Dashboard */
+.stats-dashboard {
+    display: flex;
+    justify-content: space-around;
+    background: #121212;
+    border: 1px solid #222;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 450px;
+    margin: 0 auto 15px;
+    padding: 10px 5px;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-size: 13px;
+    font-weight: bold;
+    color: #fff;
+}
+
+/* Buttons */
+button {
+    padding: 9px 14px;
+    margin: 3px;
+    font-size: 12px;
     border: none;
     border-radius: 7px;
     cursor: pointer;
@@ -120,56 +187,98 @@ button{
     background: #4CAF50;
     transition: background .15s ease;
 }
-button:hover{
+
+button:hover {
     background: #45A049;
 }
-.random-btn{
-    background: #8e44ad;
+
+.random-btn { background: #8e44ad; }
+.heart-mode-btn { background: #e91e63; }
+.swipe-mode-btn { background: #2980b9; }
+.history-btn { background: #34495e; }
+
+/* Swipe Mode Action Bar */
+.swipe-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px 0 20px;
 }
-.random-btn:hover{
-    background: #732d91;
-}
-.heart-mode-btn{
-    background: #e91e63;
-}
-.heart-mode-btn:hover{
-    background: #c2185b;
-}
-.clear-btn{
-    background: #d35400;
-}
-.clear-btn:hover{
-    background: #b84300;
+.swipe-action-btn {
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 8px;
 }
 
-/* ==========================================================
-   CONTROLS
-========================================================== */
-.controls{
+/* History Modal */
+#historyModal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 9500;
+    padding: 20px;
+    overflow-y: auto;
+    text-align: left;
+}
+.history-item {
+    display: flex;
+    align-items: center;
+    background: #151515;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid #222;
+    cursor: pointer;
+}
+.history-item:hover {
+    background: #222;
+}
+
+/* Safe Footer Clear Button */
+.footer-container {
+    margin: 40px 0 60px;
+    padding-top: 20px;
+    border-top: 1px solid #222;
+}
+
+.clear-btn {
+    background: transparent;
+    color: #666;
+    border: 1px dashed #444;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.clear-btn:hover {
+    opacity: 1;
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.05);
+}
+
+/* Controls */
+.controls {
     width: 100%;
     text-align: center;
 }
-#topControls{
-    margin-top: 10px;
-}
-#bottomControls{
-    padding-bottom: 25px;
-}
 
-/* ==========================================================
-   STATUS
-========================================================== */
-#status{
+#topControls { margin-top: 5px; }
+#bottomControls { padding-bottom: 10px; }
+
+/* Status */
+#status {
     color: #ff6666;
     font-size: 14px;
     margin: 10px;
     min-height: 20px;
 }
 
-/* ==========================================================
-   WELCOME BANNER
-========================================================== */
-#welcomeBanner{
+/* Welcome */
+#welcomeBanner {
     position: fixed;
     top: 20px;
     left: 50%;
@@ -180,15 +289,13 @@ button:hover{
     color: #fff;
     padding: 15px;
     border-radius: 10px;
-    box-shadow: 0 4px 18px rgba(255,255,255,.15);
+    box-shadow: 0 4px 18px rgba(255, 255, 255, .15);
     display: none;
     z-index: 9000;
 }
 
-/* ==========================================================
-   LOGIN
-========================================================== */
-#loginScreen{
+/* Login */
+#loginScreen {
     position: fixed;
     inset: 0;
     background: #000;
@@ -197,14 +304,16 @@ button:hover{
     align-items: center;
     z-index: 9999;
 }
-#loginBox{
+
+#loginBox {
     background: #1f1f1f;
     padding: 25px;
     border-radius: 12px;
     width: 90%;
     max-width: 360px;
 }
-#passwordInput{
+
+#passwordInput {
     width: 100%;
     padding: 10px;
     font-size: 16px;
@@ -213,73 +322,98 @@ button:hover{
     outline: none;
 }
 
-/* ==========================================================
-   APP
-========================================================== */
-#app{
-    display: none;
-}
-.hidden{
-    display: none !important;
-}
+#app { display: none; }
+.hidden { display: none !important; }
 </style>
 </head>
 
 <body>
 
-<!-- WELCOME MESSAGE -->
 <div id="welcomeBanner">
     ✅ Tracking enabled.<br><br>
     You will not see the same media twice<br>
     on this device.
 </div>
 
-<!-- LOGIN SCREEN -->
+<!-- History Modal -->
+<div id="historyModal" class="hidden">
+    <div style="max-width:450px; margin:0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
+            <h3 style="margin:0;">🕒 Recently Viewed History</h3>
+            <button onclick="toggleHistoryModal()" style="background:#c0392b; padding:6px 12px;">Close ✕</button>
+        </div>
+        <div id="historyListContainer"></div>
+    </div>
+</div>
+
 <div id="loginScreen">
     <div id="loginBox">
         <h2>Enter Access Token</h2>
-        <input id="passwordInput" type="password" placeholder="GitHub Token">
+        <input id="passwordInput" type="password" placeholder="GitHub Token (ghp_...)">
         <br><br>
         <button id="loginButton">Enter</button>
         <div id="loginError" style="color:red;margin-top:10px;"></div>
     </div>
 </div>
 
-<!-- APPLICATION -->
 <div id="app">
-    <h1>Media Viewer V3</h1>
+    <h1>Media Viewer V4</h1>
 
-    <!-- SEARCH -->
     <input id="searchInput" type="text" placeholder="Search by URL or number...">
 
-    <!-- TOP BUTTONS -->
+    <div id="statsDashboard" class="stats-dashboard">
+        <div class="stat-item">
+            <span class="stat-label">Progress</span>
+            <span id="statProgress" class="stat-value">0%</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Seen</span>
+            <span id="statSeen" class="stat-value">0 / 0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Hearts</span>
+            <span id="statHearts" class="stat-value">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Remaining</span>
+            <span id="statRemaining" class="stat-value">0</span>
+        </div>
+    </div>
+
     <div id="topControls" class="controls"></div>
 
-    <!-- STATUS -->
     <div id="status"></div>
 
-    <!-- MEDIA -->
     <div id="mediaContainer"></div>
 
-    <!-- BOTTOM BUTTONS -->
     <div id="bottomControls" class="controls"></div>
+
+    <div class="footer-container">
+        <button class="clear-btn" onclick="clearAllData()">🗑 Clear All History & Hearts</button>
+    </div>
 </div>
 
-<!-- JAVASCRIPT -->
 <script>
 /* ==========================================================
-   LOGIN SYSTEM
+   GITHUB CONFIGURATION & TOKEN LOGIN SYSTEM
 ========================================================== */
+const GITHUB_CONFIG = {
+    owner: "bottime63",
+    repo: "goldCar",
+    token: "",
+    branch: "main"
+};
+
 function checkPassword(){
     const tokenInput = document.getElementById("passwordInput").value.trim();
 
     if(tokenInput.startsWith("ghp_") || tokenInput.startsWith("github_pat_")){
-        GITHUB.token = tokenInput;
+        GITHUB_CONFIG.token = tokenInput;
         document.getElementById("loginScreen").style.display = "none";
         document.getElementById("app").style.display = "block";
         initializeApp();
     } else {
-        document.getElementById("loginError").textContent = "Invalid token";
+        document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
     }
 }
 
@@ -289,139 +423,133 @@ document.getElementById("passwordInput").addEventListener("keypress", (e) => {
 });
 
 /* ==========================================================
-   CONFIGURATION
+   CONFIGURATION & STATE
 ========================================================== */
-const PAGE_SIZE = 15;
 const SEARCH_DELAY = 250;
-
-/* ==========================================================
-   GITHUB HEART STORAGE
-========================================================== */
-const GITHUB = {
-    token: "",
-    owner: "bottime63",
-    repo: "goldCar",
-    file: "hearts.json"
-};
 
 let mediaUrls = [];
 let workingList = [];
 let currentIndex = 0;
 let searchTimer = null;
+let observer = null;
+let observerTimeout = null;
+let recentHistory = [];
 
-/* ==========================================================
-   LOCAL STORAGE KEYS
-========================================================== */
 const STORAGE = {
-    seen: "mediaViewerSeen",
-    hearts: "mediaViewerHearts",
     heartMode: "mediaViewerHeartMode",
-    random: "mediaViewerRandomState",
+    swipeMode: "mediaViewerSwipeMode",
     visited: "mediaViewerVisited"
 };
 
-/* ==========================================================
-   LOAD SAVED DATA
-========================================================== */
-let seenItems = new Set(JSON.parse(localStorage.getItem(STORAGE.seen) || "[]"));
+let seenItems = new Set();
 let heartedItems = new Set();
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
-let randomState = JSON.parse(localStorage.getItem(STORAGE.random) || "{}");
+let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
 /* ==========================================================
-   SAVE FUNCTIONS
+   GITHUB API SAVE & LOAD FUNCTIONS
 ========================================================== */
-function saveSeen(){
-    localStorage.setItem(STORAGE.seen, JSON.stringify([...seenItems]));
+async function fetchGitHubFile(path) {
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+        const res = await fetch(url, {
+            headers: { Authorization: `token ${GITHUB_CONFIG.token}` }
+        });
+        if(!res.ok) return null;
+        const data = await res.json();
+        const content = JSON.parse(atob(data.content));
+        return { content, sha: data.sha };
+    } catch(e) {
+        console.log(`Could not load ${path} from GitHub:`, e);
+        return null;
+    }
 }
 
-async function loadGithubHearts(){
-    try{
-        const response = await fetch(
-            `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.file}`,
-            {
-                headers: {
-                    Authorization: `token ${GITHUB.token}`
-                }
-            }
-        );
+async function saveGitHubFile(path, dataArray) {
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+        const existing = await fetchGitHubFile(path);
+        const sha = existing ? existing.sha : undefined;
+        const contentBase64 = btoa(JSON.stringify(dataArray, null, 2));
 
-        if (!response.ok) throw new Error("Failed to fetch hearts from GitHub");
+        const body = {
+            message: `Update ${path} from Mobile Viewer`,
+            content: contentBase64,
+            branch: GITHUB_CONFIG.branch
+        };
+        if(sha) body.sha = sha;
 
-        const data = await response.json();
-        const content = atob(data.content);
-        heartedItems = new Set(JSON.parse(content));
-        console.log("Loaded GitHub hearts:", heartedItems);
-    } catch(error){
-        console.log("GitHub heart loading failed:", error);
+        await fetch(url, {
+            method: "PUT",
+            headers: {
+                "Authorization": `token ${GITHUB_CONFIG.token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+        });
+    } catch(error) {
+        console.log(`Failed to save ${path} to GitHub:`, error);
     }
+    updateStatsDashboard();
+}
+
+async function loadServerData(){
+    const heartsRes = await fetchGitHubFile("saved_hearts.json");
+    if(heartsRes && Array.isArray(heartsRes.content)) {
+        heartedItems = new Set(heartsRes.content);
+    }
+
+    const seenRes = await fetchGitHubFile("seen_media.json");
+    if(seenRes && Array.isArray(seenRes.content)) {
+        seenItems = new Set(seenRes.content);
+    }
+
+    updateStatsDashboard();
 }
 
 async function saveHearts(){
-    try {
-        const fileResponse = await fetch(
-            `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.file}`,
-            {
-                headers: {
-                    Authorization: `token ${GITHUB.token}`
-                }
-            }
-        );
+    await saveGitHubFile("saved_hearts.json", [...heartedItems]);
+}
 
-        const fileData = await fileResponse.json();
-        if(!fileResponse.ok){
-            console.log("GitHub error:", fileData);
-            return;
-        }
-
-        const content = JSON.stringify([...heartedItems], null, 2);
-
-        await fetch(
-            `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.file}`,
-            {
-                method: "PUT",
-                headers: {
-                    Authorization: `token ${GITHUB.token}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    message: "Update hearts",
-                    content: btoa(content),
-                    sha: fileData.sha
-                })
-            }
-        );
-    } catch (error) {
-        console.error("Failed to save hearts to GitHub:", error);
-    }
+async function saveSeen(){
+    await saveGitHubFile("seen_media.json", [...seenItems]);
 }
 
 function saveSettings(){
     localStorage.setItem(STORAGE.heartMode, heartMode.toString());
-}
-
-function saveRandomState(){
-    localStorage.setItem(STORAGE.random, JSON.stringify(randomState));
-}
-
-function saveAll(){
-    saveSeen();
-    saveHearts();
-    saveSettings();
-    saveRandomState();
+    localStorage.setItem(STORAGE.swipeMode, swipeMode.toString());
 }
 
 /* ==========================================================
-   FIRST VISIT MESSAGE
+   STATS DASHBOARD
+========================================================== */
+function updateStatsDashboard(){
+    const total = mediaUrls.length;
+    const seen = seenItems.size;
+    const hearts = heartedItems.size;
+    const remaining = Math.max(0, total - seen);
+    const percentage = total > 0 ? Math.round((seen / total) * 100) : 0;
+
+    const progEl = document.getElementById("statProgress");
+    const seenEl = document.getElementById("statSeen");
+    const heartsEl = document.getElementById("statHearts");
+    const remEl = document.getElementById("statRemaining");
+
+    if(progEl) progEl.textContent = percentage + "%";
+    if(seenEl) seenEl.textContent = `${seen} / ${total}`;
+    if(heartsEl) heartsEl.textContent = hearts;
+    if(remEl) remEl.textContent = remaining;
+}
+
+/* ==========================================================
+   WELCOME BANNER
 ========================================================== */
 function showWelcome(){
     const visited = localStorage.getItem(STORAGE.visited);
     if(!visited){
         const banner = document.getElementById("welcomeBanner");
         banner.style.display = "block";
-        setTimeout(()=>{
-            banner.style.display = "none";
-        }, 5000);
+        setTimeout(() => { banner.style.display = "none"; }, 5000);
         localStorage.setItem(STORAGE.visited, "true");
     }
 }
@@ -430,18 +558,11 @@ function showWelcome(){
    MEDIA DETECTION
 ========================================================== */
 function isImage(url){
-    return (
-        /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) ||
-        url.includes("pbs.twimg.com") ||
-        url.includes("abs.twimg.com")
-    );
+    return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
 }
 
 function isVideo(url){
-    return (
-        /\.(mp4|webm|mov|m4v)$/i.test(url) ||
-        url.includes("video.twimg.com")
-    );
+    return /\.(mp4|webm|mov|m4v)$/i.test(url) || url.includes("video.twimg.com");
 }
 
 function normalizeImageURL(url){
@@ -454,25 +575,21 @@ function normalizeImageURL(url){
 
 function createMediaElement(item){
     let element = null;
-
     if(isVideo(item.url)){
         const video = document.createElement("video");
         video.src = item.url;
         video.controls = true;
         video.playsInline = true;
         video.preload = "metadata";
-        video.onloadeddata = () => { markAsSeen(item); };
         element = video;
     } else if(isImage(item.url)){
         const img = document.createElement("img");
         img.src = normalizeImageURL(item.url);
-        img.loading = "auto";
+        img.loading = "lazy";
         img.decoding = "async";
-        img.onload = () => { markAsSeen(item); };
         img.onerror = () => { img.style.display = "none"; };
         element = img;
     }
-
     return element;
 }
 
@@ -480,10 +597,7 @@ function createMediaElement(item){
    HELPERS
 ========================================================== */
 function snapToTop(){
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
+    window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function shuffleArray(array){
@@ -509,8 +623,10 @@ function debouncedSearch(){
     searchTimer = setTimeout(applySearch, SEARCH_DELAY);
 }
 
+document.getElementById("searchInput").addEventListener("input", debouncedSearch);
+
 /* ==========================================================
-   HEART SYSTEM
+   HEART SYSTEM & DOUBLE TAP
 ========================================================== */
 function toggleHeart(index){
     if(heartedItems.has(index)){
@@ -521,16 +637,12 @@ function toggleHeart(index){
 
     saveHearts();
 
-    const buttons = document.querySelectorAll(".heart-btn");
-    buttons.forEach(btn=>{
+    document.querySelectorAll(".heart-btn").forEach(btn => {
         if(Number(btn.dataset.index) === index){
             const active = heartedItems.has(index);
             btn.textContent = active ? "❤️" : "♡";
-            if(active){
-                btn.classList.add("active");
-            } else {
-                btn.classList.remove("active");
-            }
+            if(active) btn.classList.add("active");
+            else btn.classList.remove("active");
         }
     });
 
@@ -539,26 +651,104 @@ function toggleHeart(index){
     }
 }
 
+function handleDoubleTap(itemIndex, wrapperElement) {
+    toggleHeart(itemIndex);
+
+    const existingHeart = wrapperElement.querySelector(".floating-heart");
+    if(existingHeart) existingHeart.remove();
+
+    const heartPop = document.createElement("div");
+    heartPop.className = "floating-heart";
+    heartPop.textContent = "❤️";
+    wrapperElement.appendChild(heartPop);
+
+    setTimeout(() => { heartPop.remove(); }, 600);
+}
+
 function showHeartedOnly(){
     heartMode = !heartMode;
     saveSettings();
     workingList = buildDisplayList();
+    shuffleArray(workingList);
     currentIndex = 0;
     render();
     snapToTop();
 }
 
-function clearHearts(){
-    if(!confirm("Clear all hearts?")){
+function toggleSwipeMode(){
+    swipeMode = !swipeMode;
+    saveSettings();
+    currentIndex = 0;
+    render();
+    snapToTop();
+}
+
+/* ==========================================================
+   RECENTLY VIEWED HISTORY DRAWER
+========================================================== */
+function addToHistory(item){
+    recentHistory = recentHistory.filter(i => i.index !== item.index);
+    recentHistory.unshift(item);
+    if(recentHistory.length > 20) recentHistory.pop();
+}
+
+function toggleHistoryModal(){
+    const modal = document.getElementById("historyModal");
+    modal.classList.toggle("hidden");
+
+    if(!modal.classList.contains("hidden")){
+        renderHistoryList();
+    }
+}
+
+function renderHistoryList(){
+    const container = document.getElementById("historyListContainer");
+    if(recentHistory.length === 0){
+        container.innerHTML = '<p style="color:#777; text-align:center;">No recent history yet.</p>';
         return;
     }
+
+    container.innerHTML = recentHistory.map(item => `
+        <div class="history-item" onclick="jumpToHistoryItem(${item.index})">
+            <div style="font-size:16px; margin-right:10px;">#${item.index}</div>
+            <div style="font-size:12px; color:#aaa; word-break:break-all; flex:1;">${item.url}</div>
+            <div style="font-size:16px; margin-left:10px;">${heartedItems.has(item.index) ? "❤️" : ""}</div>
+        </div>
+    `).join("");
+}
+
+function jumpToHistoryItem(index){
+    toggleHistoryModal();
+    const foundIndex = workingList.findIndex(item => item.index === index);
+    if(foundIndex !== -1){
+        currentIndex = foundIndex;
+    } else {
+        const item = mediaUrls.find(i => i.index === index);
+        if(item){
+            workingList.unshift(item);
+            currentIndex = 0;
+        }
+    }
+    render();
+    snapToTop();
+}
+
+function clearAllData(){
+    if(!confirm("Clear all GitHub hearts and seen media history?")) return;
+
     heartedItems.clear();
+    seenItems.clear();
+    recentHistory = [];
+
     saveHearts();
-    const buttons = document.querySelectorAll(".heart-btn");
-    buttons.forEach(btn=>{
+    saveSeen();
+
+    document.querySelectorAll(".heart-btn").forEach(btn => {
         btn.textContent = "♡";
         btn.classList.remove("active");
     });
+
+    applySearch();
 }
 
 /* ==========================================================
@@ -569,31 +759,52 @@ function buildDisplayList(){
     const query = document.getElementById("searchInput").value.toLowerCase().trim();
 
     if(query){
-        const number = query.replace("#", "");
-        list = list.filter(item =>
-            item.url.toLowerCase().includes(query) ||
-            item.index.toString() === number
-        );
+        const number = query.replace("#","");
+        list = list.filter(item => item.url.toLowerCase().includes(query) || item.index.toString() === number);
+    } else if(heartMode){
+        list = list.filter(item => heartedItems.has(item.index));
     } else {
         list = list.filter(item => !seenItems.has(item.index));
     }
 
-    if(heartMode){
-        list = list.filter(item => heartedItems.has(item.index));
-    }
-
-    shuffleArray(list);
     return list;
 }
 
 /* ==========================================================
-   TRACK VIEWED MEDIA
+   TRACK SEEN MEDIA WITH INTERSECTION
 ========================================================== */
-function markAsSeen(item){
-    if(item && item.index){
-        seenItems.add(item.index);
-        saveSeen();
-    }
+function setupObserver(){
+    if(observer) observer.disconnect();
+    if(observerTimeout) clearTimeout(observerTimeout);
+
+    observerTimeout = setTimeout(() => {
+        observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting){
+                    const index = Number(entry.target.dataset.index);
+                    if(index && !heartMode && !seenItems.has(index)){
+                        seenItems.add(index);
+                        saveSeen();
+
+                        const numberEl = document.getElementById(`num-${index}`);
+                        if(numberEl && !numberEl.querySelector(".seen-badge")) {
+                            const badge = document.createElement("span");
+                            badge.className = "seen-badge";
+                            badge.style.marginLeft = "6px";
+                            badge.textContent = "👀 Seen";
+                            numberEl.appendChild(badge);
+                        }
+
+                        obs.unobserve(entry.target);
+                    }
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll(".media-container").forEach(wrapper => {
+            observer.observe(wrapper);
+        });
+    }, 1500);
 }
 
 /* ==========================================================
@@ -601,36 +812,46 @@ function markAsSeen(item){
 ========================================================== */
 function renderControls(){
     const html = `
-        <button class="random-btn" onclick="nextRandomPage()">🎲 Random Page</button>
-        <button class="heart-mode-btn" onclick="showHeartedOnly()">
-            ${heartMode ? "❤️ Showing Hearts" : "♡ Hearts"}
-        </button>
-        <button class="clear-btn" onclick="clearHearts()">🗑 Clear Hearts</button>
+        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
+        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
+        <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
     `;
-
     document.getElementById("topControls").innerHTML = html;
     document.getElementById("bottomControls").innerHTML = html;
 }
 
 function render(){
     renderControls();
+    updateStatsDashboard();
 
     const container = document.getElementById("mediaContainer");
     container.innerHTML = "";
     document.getElementById("status").textContent = "";
 
+    const pageSize = swipeMode ? 1 : 15;
     let shown = 0;
+    let lastTapTime = 0;
 
-    while(shown < PAGE_SIZE && currentIndex < workingList.length){
+    while(shown < pageSize && currentIndex < workingList.length){
         const item = workingList[currentIndex];
         currentIndex++;
 
+        addToHistory(item);
+
         const wrapper = document.createElement("div");
         wrapper.className = "media-container";
+        wrapper.dataset.index = item.index;
 
         const number = document.createElement("div");
         number.className = "media-number";
+        number.id = `num-${item.index}`;
         number.textContent = "#" + item.index;
+
+        if(!heartMode && seenItems.has(item.index)){
+            number.innerHTML += ' <span class="seen-badge" style="margin-left:6px;">👀 Seen</span>';
+        }
+
         wrapper.appendChild(number);
 
         const heart = document.createElement("button");
@@ -639,14 +860,9 @@ function render(){
 
         const isHearted = heartedItems.has(item.index);
         heart.textContent = isHearted ? "❤️" : "♡";
-        if(isHearted){
-            heart.classList.add("active");
-        }
+        if(isHearted) heart.classList.add("active");
 
-        heart.onclick = ()=>{
-            toggleHeart(item.index);
-        };
-
+        heart.onclick = () => toggleHeart(item.index);
         wrapper.appendChild(heart);
 
         const link = document.createElement("a");
@@ -655,14 +871,41 @@ function render(){
         link.textContent = item.url;
         wrapper.appendChild(link);
 
-        markAsSeen(item);
         const media = createMediaElement(item);
-        if(media){
+        if(media) {
+            media.addEventListener("click", (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                if (tapLength < 300 && tapLength > 0) {
+                    e.preventDefault();
+                    handleDoubleTap(item.index, wrapper);
+                }
+                lastTapTime = currentTime;
+            });
             wrapper.appendChild(media);
+        }
+
+        if(swipeMode){
+            const swipeActions = document.createElement("div");
+            swipeActions.className = "swipe-actions";
+            swipeActions.innerHTML = `
+                <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
+                <button class="swipe-action-btn" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
+            `;
+            wrapper.appendChild(swipeActions);
+
+            if(!heartMode && !seenItems.has(item.index)){
+                seenItems.add(item.index);
+                saveSeen();
+            }
         }
 
         container.appendChild(wrapper);
         shown++;
+    }
+
+    if(!swipeMode){
+        setupObserver();
     }
 }
 
@@ -670,64 +913,53 @@ function render(){
    RANDOM PAGE SYSTEM
 ========================================================== */
 function nextRandomPage(){
-    workingList = buildDisplayList();
-    shuffleArray(workingList);
-    currentIndex = 0;
+    snapToTop();
 
-    if(workingList.length === 0){
-        seenItems.clear();
-        saveSeen();
+    if(heartMode){
+        if(currentIndex >= workingList.length){
+            shuffleArray(workingList);
+            currentIndex = 0;
+            document.getElementById("status").textContent = "❤️ All hearts viewed! Reshuffling hearts.";
+        }
+    } else {
         workingList = buildDisplayList();
         shuffleArray(workingList);
-        document.getElementById("status").textContent = "🎉 Cycle complete. Starting again.";
+        currentIndex = 0;
+
+        if(workingList.length === 0){
+            seenItems.clear();
+            saveSeen();
+            workingList = buildDisplayList();
+            shuffleArray(workingList);
+            document.getElementById("status").textContent = "🎉 Cycle complete. Starting again.";
+        }
     }
 
     render();
-    snapToTop();
 }
-
-/* ==========================================================
-   BOTTOM BUTTON BEHAVIOR
-========================================================== */
-function setupBottomButtons(){
-    document.getElementById("bottomControls").addEventListener("click", ()=>{
-        setTimeout(snapToTop, 100);
-    });
-}
-
-/* ==========================================================
-   SEARCH LISTENER
-========================================================== */
-document.getElementById("searchInput").addEventListener("input", debouncedSearch);
 
 /* ==========================================================
    START APPLICATION
 ========================================================== */
-function initializeApp(){
-    fetch("mediaNEW.json")
-    .then(response=>{
-        if(!response.ok){
-            throw new Error("Could not load mediaNEW.json");
-        }
-        return response.json();
-    })
-    .then(async data=>{
-        mediaUrls = data.map((url, index)=>({
-            url: url,
-            index: index + 1
-        }));
+async function initializeApp(){
+    try {
+        const response = await fetch("mediaNEW.json?t=" + new Date().getTime());
+        if(!response.ok) throw new Error("Could not load mediaNEW.json");
+        const data = await response.json();
 
-        await loadGithubHearts();
+        mediaUrls = data.map((url, index) => ({ url: url, index: index + 1 }));
+
+        await loadServerData();
         showWelcome();
-        setupBottomButtons();
 
         workingList = buildDisplayList();
+        shuffleArray(workingList);
+
         currentIndex = 0;
         render();
-    })
-    .catch(error=>{
+    } catch(error) {
         document.getElementById("status").textContent = "Error: " + error.message;
-    });
+    }
 }
 </script>
 
