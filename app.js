@@ -53,13 +53,11 @@ const STORAGE = {
     seenLocal: "mediaViewerLocalSeen"
 };
 
-// Load initial state instantly from localStorage for maximum speed
 let seenItems = new Set(JSON.parse(localStorage.getItem(STORAGE.seenLocal) || "[]"));
 let heartedItems = new Set(JSON.parse(localStorage.getItem(STORAGE.heartsLocal) || "[]"));
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
-// Sync flags for debouncing
 let heartsDirty = false;
 let seenDirty = false;
 let syncTimeout = null;
@@ -122,9 +120,7 @@ async function saveGitHubFileDirect(path, dataArray, useKeepalive = false) {
     }
 }
 
-// Debounced Sync Trigger (Runs 3 seconds after last change)
 function triggerSync() {
-    // Always persist instantly to local storage first
     localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
     localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
     updateStatsDashboard();
@@ -142,11 +138,9 @@ function triggerSync() {
     }, 3000);
 }
 
-// Force immediate flush when leaving or switching apps
 function flushChanges(useKeepalive = false) {
     if (syncTimeout) clearTimeout(syncTimeout);
     
-    // Save to localStorage immediately
     localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
     localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
 
@@ -160,7 +154,28 @@ function flushChanges(useKeepalive = false) {
     }
 }
 
-// Bind lifecycle events for mobile/desktop switching and closing
+// Manual Backup Function triggered by the new button
+async function manualBackupToGitHub() {
+    const statusEl = document.getElementById("status");
+    if(statusEl) statusEl.textContent = "⏳ Backing up to GitHub...";
+
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
+
+    await saveGitHubFileDirect("saved_hearts.json", [...heartedItems]);
+    await saveGitHubFileDirect("seen_media.json", [...seenItems]);
+
+    heartsDirty = false;
+    seenDirty = false;
+
+    if(statusEl) statusEl.textContent = "✅ Manual backup complete!";
+    setTimeout(() => {
+        if(statusEl && statusEl.textContent === "✅ Manual backup complete!") {
+            statusEl.textContent = "";
+        }
+    }, 3000);
+}
+
 window.addEventListener("beforeunload", () => flushChanges(true));
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
@@ -169,7 +184,6 @@ document.addEventListener("visibilitychange", () => {
 });
 
 async function loadServerData(){
-    // Merge server data with local cache (Union of both for safety)
     const heartsRes = await fetchGitHubFile("saved_hearts.json");
     if(heartsRes && Array.isArray(heartsRes.content)) {
         heartsRes.content.forEach(id => heartedItems.add(id));
@@ -496,7 +510,7 @@ function setupObserver(){
 }
 
 /* ==========================================================
-   RENDER SYSTEM
+   RENDER SYSTEM (Now includes Backup Button)
 ========================================================== */
 function renderControls(){
     const html = `
@@ -504,6 +518,7 @@ function renderControls(){
         <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
         <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
         <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+        <button class="backup-btn" onclick="manualBackupToGitHub()" style="background:#27ae60; color:white;">💾 Backup</button>
     `;
     const topCtrl = document.getElementById("topControls");
     const botCtrl = document.getElementById("bottomControls");
