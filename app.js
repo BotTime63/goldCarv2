@@ -2,9 +2,9 @@
    GITHUB CONFIGURATION (For iPhone & PC Sync)
 ========================================================== */
 const GITHUB_CONFIG = {
-    owner: "YOUR_GITHUB_USERNAME",
-    repo: "YOUR_REPO_NAME",
-    token: "YOUR_GITHUB_TOKEN",
+    owner: "BotTime63",
+    repo: "goldCarv2",
+    token: "ghp_ptl5wU4wFd8Zqiq4H9QK-BUYdb5DNgc20aHHi",
     branch: "main"
 };
 
@@ -73,7 +73,7 @@ async function fetchGitHubFile(path) {
 async function saveGitHubFile(path, dataArray) {
     try {
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
-
+        
         const existing = await fetchGitHubFile(path);
         const sha = existing ? existing.sha : undefined;
 
@@ -294,7 +294,6 @@ function toggleSwipeMode(){
    RECENTLY VIEWED HISTORY DRAWER
 ========================================================== */
 function addToHistory(item){
-    // Avoid duplicates at top and keep last 20 items
     recentHistory = recentHistory.filter(i => i.index !== item.index);
     recentHistory.unshift(item);
     if(recentHistory.length > 20) recentHistory.pop();
@@ -331,7 +330,6 @@ function jumpToHistoryItem(index){
     if(foundIndex !== -1){
         currentIndex = foundIndex;
     } else {
-        // If not in current working list, add it temporarily
         const item = mediaUrls.find(i => i.index === index);
         if(item){
             workingList.unshift(item);
@@ -494,7 +492,6 @@ function render(){
             wrapper.appendChild(media);
         }
 
-        // If Swipe Mode is ON, render large mobile action buttons underneath
         if(swipeMode){
             const swipeActions = document.createElement("div");
             swipeActions.className = "swipe-actions";
@@ -504,7 +501,6 @@ function render(){
             `;
             wrapper.appendChild(swipeActions);
 
-            // Mark seen immediately in swipe mode
             if(!heartMode && !seenItems.has(item.index)){
                 seenItems.add(item.index);
                 saveSeen();
