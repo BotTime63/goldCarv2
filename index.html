@@ -4,423 +4,728 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <meta name="referrer" content="no-referrer">
-
-<!-- PWA / iOS App Mode Meta Tags -->
-<link rel="manifest" href="manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Media Viewer">
-
-<title>Media Viewer V4</title>
-
+<title>Media Viewer V4 - Live GitHub Sync</title>
 <style>
-* {
-    box-sizing: border-box;
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+    margin:0; padding:0; overflow-x:hidden;
+    background:#000; color:#e0e0e0;
+    font-family:Arial,Helvetica,sans-serif;
+    text-align:center; user-select:none;
+}
+h1{ margin:15px 0; font-size:26px; font-weight:bold; }
+a{ color:#00AAFF; }
+img, video{ -webkit-user-drag:none; user-select:none; }
+
+/* DASHBOARD & STATS */
+.stats-dashboard{
+    display:flex; justify-content:space-around; background:#111;
+    padding:10px; margin-bottom:10px; border-bottom:1px solid #333; font-size:13px;
+}
+.stat-box span{ display:block; font-size:16px; font-weight:bold; color:#4CAF50; }
+
+/* MEDIA DISPLAY */
+.media-container{
+    width:100vw; display:flex; flex-direction:column; align-items:center;
+    margin:0; padding:0 0 15px 0; position:relative;
+}
+.media-container img, .media-container video{
+    width:auto; max-width:100vw; max-height:75vh; height:auto;
+    object-fit:contain; background:#000; display:block;
+    touch-action:pan-x pan-y pinch-zoom;
+}
+.media-number{ margin:6px 0 4px; font-size:12px; opacity:.7; display:flex; align-items:center; justify-content:center; }
+.seen-badge{ background:#27ae60; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px; }
+.media-container a{ width:95%; margin:6px 0 10px; font-size:11px; word-break:break-all; text-decoration:none; }
+
+/* HEART BUTTON & FLOATING HEART */
+.heart-btn{
+    border:none; background:transparent; color:#ffffff; font-size:32px;
+    cursor:pointer; padding:0; margin:5px 0; transition:transform .15s ease; z-index:10;
+}
+.heart-btn:hover{ transform:scale(1.15); }
+.heart-btn.active{ color:#ff2d55; }
+
+@keyframes floatUp {
+    0% { transform: scale(0.3) translateY(0); opacity: 1; }
+    100% { transform: scale(1.5) translateY(-80px); opacity: 0; }
+}
+.floating-heart{
+    position: absolute; font-size: 50px; pointer-events: none;
+    animation: floatUp 0.6s ease-out forwards; z-index: 50; top: 40%;
 }
 
-html {
-    scroll-behavior: smooth;
-    overscroll-behavior-y: none;
+/* SEARCH & INPUTS */
+#searchInput{
+    width:90%; max-width:450px; margin:10px auto; padding:10px;
+    font-size:16px; border:none; border-radius:8px; outline:none; background:#222; color:#fff;
 }
 
-body {
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-    background: #000;
-    color: #e0e0e0;
-    font-family: Arial, Helvetica, sans-serif;
-    text-align: center;
-    user-select: none;
-    -webkit-touch-callout: none;
+/* BUTTONS */
+button{
+    padding:10px 16px; margin:5px; font-size:14px; border:none;
+    border-radius:7px; cursor:pointer; color:#fff; background:#4CAF50; transition:background .15s ease;
+}
+button:hover{ background:#45A049; }
+.random-btn{ background:#8e44ad; }
+.random-btn:hover{ background:#732d91; }
+.heart-mode-btn{ background:#e91e63; }
+.heart-mode-btn:hover{ background:#c2185b; }
+.swipe-mode-btn{ background:#2980b9; }
+.history-btn{ background:#d35400; }
+
+.controls{ width:100%; text-align:center; margin:10px 0; }
+
+/* SWIPE ACTIONS (BOTTOM OF CARD IN SWIPE MODE) */
+.swipe-actions{ display:flex; gap:10px; margin-top:8px; }
+.swipe-action-btn{ padding:8px 14px; font-size:13px; border-radius:6px; }
+
+/* HISTORY MODAL */
+#historyModal{
+    position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:8000;
+    display:flex; flex-direction:column; align-items:center; padding:20px; overflow-y:auto;
+}
+.history-item{
+    background:#1f1f1f; width:100%; max-width:500px; padding:10px; margin:5px 0;
+    border-radius:6px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+}
+.history-item:hover{ background:#333; }
+
+/* STATUS */
+#status{ color:#ff6666; font-size:14px; margin:10px; min-height:20px; }
+
+/* WELCOME BANNER */
+#welcomeBanner{
+    position:fixed; top:20px; left:50%; transform:translateX(-50%);
+    width:90%; max-width:450px; background:#222; color:#fff; padding:15px;
+    border-radius:10px; box-shadow:0 4px 18px rgba(255,255,255,.15); display:none; z-index:9000;
 }
 
-h1 {
-    margin: 15px 0 10px;
-    font-size: 26px;
-    font-weight: bold;
+/* LOGIN SCREEN */
+#loginScreen{
+    position:fixed; inset:0; background:#000; display:flex; justify-content:center; align-items:center; z-index:9999;
 }
-
-a {
-    color: #00AAFF;
-}
-
-img, video {
-    -webkit-user-drag: none;
-    user-select: none;
-}
-
-/* Media */
-.media-container {
-    width: 100vw;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin: 0;
-    padding: 0 0 15px;
-    position: relative;
-}
-
-.media-container img,
-.media-container video {
-    width: auto;
-    max-width: 100vw;
-    max-height: 75vh;
-    height: auto;
-    object-fit: contain;
-    background: #000;
-    display: block;
-    touch-action: pan-x pan-y pinch-zoom;
-    cursor: pointer;
-}
-
-.media-number {
-    margin: 6px 0 4px;
-    font-size: 12px;
-    opacity: .55;
-}
-
-.media-container a {
-    width: 95%;
-    margin: 6px 0 10px;
-    font-size: 11px;
-    word-break: break-all;
-    text-decoration: none;
-}
-
-/* Heart */
-.heart-btn {
-    border: none;
-    background: transparent;
-    color: #fff;
-    font-size: 28px;
-    cursor: pointer;
-    padding: 0;
-    margin: 5px 0;
-    transition: transform .15s ease;
-}
-
-.heart-btn:hover {
-    transform: scale(1.15);
-}
-
-.heart-btn.active {
-    color: #ff2d55;
-}
-
-/* Floating Double-Tap Heart Animation */
-.floating-heart {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    font-size: 90px;
-    color: #ff2d55;
-    pointer-events: none;
-    z-index: 50;
-    animation: popHeart 0.6s ease-out forwards;
-    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6));
-}
-
-@keyframes popHeart {
-    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-    30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-    60% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
-}
-
-/* Search */
-#searchInput {
-    width: 90%;
-    max-width: 450px;
-    margin: 5px auto 10px;
-    padding: 10px;
-    font-size: 16px;
-    border: none;
-    border-radius: 8px;
-    outline: none;
-}
-
-/* Stats Dashboard */
-.stats-dashboard {
-    display: flex;
-    justify-content: space-around;
-    background: #121212;
-    border: 1px solid #222;
-    border-radius: 10px;
-    width: 90%;
-    max-width: 450px;
-    margin: 0 auto 15px;
-    padding: 10px 5px;
-}
-
-.stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-}
-
-.stat-label {
-    font-size: 10px;
-    color: #888;
-    text-transform: uppercase;
-    margin-bottom: 3px;
-    letter-spacing: 0.5px;
-}
-
-.stat-value {
-    font-size: 13px;
-    font-weight: bold;
-    color: #fff;
-}
-
-/* Buttons */
-button {
-    padding: 9px 14px;
-    margin: 3px;
-    font-size: 12px;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-    color: #fff;
-    background: #4CAF50;
-    transition: background .15s ease;
-}
-
-button:hover {
-    background: #45A049;
-}
-
-.random-btn {
-    background: #8e44ad;
-}
-.heart-mode-btn {
-    background: #e91e63;
-}
-.swipe-mode-btn {
-    background: #2980b9;
-}
-.history-btn {
-    background: #34495e;
-}
-
-/* Swipe Mode Action Bar */
-.swipe-actions {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 10px 0 20px;
-}
-.swipe-action-btn {
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: bold;
-    border-radius: 8px;
-}
-
-/* History Modal */
-#historyModal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.92);
-    z-index: 9500;
-    padding: 20px;
-    overflow-y: auto;
-    text-align: left;
-}
-.history-item {
-    display: flex;
-    align-items: center;
-    background: #151515;
-    padding: 10px;
-    margin-bottom: 8px;
-    border-radius: 8px;
-    border: 1px solid #222;
-    cursor: pointer;
-}
-.history-item:hover {
-    background: #222;
-}
-.history-thumb {
-    width: 50px;
-    height: 50px;
-    object-fit: cover;
-    border-radius: 4px;
-    margin-right: 12px;
-    background: #000;
-}
-
-/* Safe Footer Clear Button */
-.footer-container {
-    margin: 40px 0 60px;
-    padding-top: 20px;
-    border-top: 1px solid #222;
-}
-
-.clear-btn {
-    background: transparent;
-    color: #666;
-    border: 1px dashed #444;
-    font-size: 12px;
-    padding: 8px 14px;
-    border-radius: 6px;
-    opacity: 0.7;
-    transition: all 0.2s ease;
-}
-
-.clear-btn:hover {
-    opacity: 1;
-    color: #ff6b6b;
-    border-color: #ff6b6b;
-    background: rgba(255, 107, 107, 0.05);
-}
-
-/* Controls */
-.controls {
-    width: 100%;
-    text-align: center;
-}
-
-#topControls { margin-top: 5px; }
-#bottomControls { padding-bottom: 10px; }
-
-/* Status */
-#status {
-    color: #ff6666;
-    font-size: 14px;
-    margin: 10px;
-    min-height: 20px;
-}
-
-/* Welcome */
-#welcomeBanner {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 450px;
-    background: #222;
-    color: #fff;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 18px rgba(255, 255, 255, .15);
-    display: none;
-    z-index: 9000;
-}
-
-/* Login */
-#loginScreen {
-    position: fixed;
-    inset: 0;
-    background: #000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-}
-
-#loginBox {
-    background: #1f1f1f;
-    padding: 25px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 360px;
-}
-
-#passwordInput {
-    width: 100%;
-    padding: 10px;
-    font-size: 16px;
-    border: none;
-    border-radius: 6px;
-    outline: none;
-}
-
-#app { display: none; }
-.hidden { display: none !important; }
+#loginBox{ background:#1f1f1f; padding:25px; border-radius:12px; width:90%; max-width:360px; }
+#passwordInput{ width:100%; padding:10px; font-size:16px; border:none; border-radius:6px; outline:none; background:#2c2c2c; color:#fff; }
+#app{ display:none; }
+.hidden{ display:none !important; }
 </style>
 </head>
 
 <body>
 
+<!-- WELCOME BANNER -->
 <div id="welcomeBanner">
-    ✅ Tracking enabled.<br><br>
-    You will not see the same media twice<br>
-    on this device.
+    ✅ Live GitHub Sync Enabled.<br><br>
+    Your hearts and seen history sync directly to your repository!
 </div>
 
-<!-- History Modal -->
-<div id="historyModal" class="hidden">
-    <div style="max-width:450px; margin:0 auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
-            <h3 style="margin:0;">🕒 Recently Viewed History</h3>
-            <button onclick="toggleHistoryModal()" style="background:#c0392b; padding:6px 12px;">Close ✕</button>
-        </div>
-        <div id="historyListContainer"></div>
-    </div>
-</div>
-
+<!-- LOGIN SCREEN -->
 <div id="loginScreen">
     <div id="loginBox">
-        <h2>Enter Password</h2>
-
-        <input
-            id="passwordInput"
-            type="password"
-            placeholder="Password"
-        >
-
+        <h2>Enter GitHub Token</h2>
+        <input id="passwordInput" type="password" placeholder="ghp_... or github_pat_...">
         <br><br>
-
-        <button id="loginButton">Enter</button>
-
+        <button id="loginButton">Connect & Load</button>
         <div id="loginError" style="color:red;margin-top:10px;"></div>
     </div>
 </div>
 
+<!-- APPLICATION -->
 <div id="app">
     <h1>Media Viewer V4</h1>
 
-    <input
-        id="searchInput"
-        type="text"
-        placeholder="Search by URL or number..."
-    >
-
-    <div id="statsDashboard" class="stats-dashboard">
-        <div class="stat-item">
-            <span class="stat-label">Progress</span>
-            <span id="statProgress" class="stat-value">0%</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Seen</span>
-            <span id="statSeen" class="stat-value">0 / 0</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Hearts</span>
-            <span id="statHearts" class="stat-value">0</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Remaining</span>
-            <span id="statRemaining" class="stat-value">0</span>
-        </div>
+    <!-- STATS DASHBOARD -->
+    <div class="stats-dashboard">
+        <div class="stat-box">Progress <span id="statProgress">0%</span></div>
+        <div class="stat-box">Seen <span id="statSeen">0 / 0</span></div>
+        <div class="stat-box">Hearts <span id="statHearts">0</span></div>
+        <div class="stat-box">Remaining <span id="statRemaining">0</span></div>
     </div>
 
+    <!-- SEARCH -->
+    <input id="searchInput" type="text" placeholder="Search by URL or #number...">
+
+    <!-- TOP CONTROLS -->
     <div id="topControls" class="controls"></div>
 
+    <!-- STATUS -->
     <div id="status"></div>
 
+    <!-- MEDIA CONTAINER -->
     <div id="mediaContainer"></div>
 
+    <!-- BOTTOM CONTROLS -->
     <div id="bottomControls" class="controls"></div>
-
-    <div class="footer-container">
-        <button class="clear-btn" onclick="clearHearts()">🗑 Clear All History & Hearts</button>
-    </div>
 </div>
 
-<script src="app.js"></script>
+<!-- RECENT HISTORY MODAL -->
+<div id="historyModal" class="hidden">
+    <h2 style="color:#fff; margin-top:0;">Recently Viewed History</h2>
+    <div id="historyListContainer" style="width:100%; max-width:500px; flex:1; overflow-y:auto;"></div>
+    <button onclick="toggleHistoryModal()" style="background:#e74c3c; margin-top:15px;">Close History</button>
+</div>
+
+<script>
+/* ==========================================================
+   GITHUB CONFIGURATION
+========================================================== */
+const GITHUB_CONFIG = {
+    owner: "BotTime63",
+    repo: "goldCarv2",
+    branch: "main"
+};
+let githubToken = "";
+
+function checkPassword(){
+    const tokenInput = document.getElementById("passwordInput").value.trim();
+    if(tokenInput.startsWith("ghp_") || tokenInput.startsWith("github_pat_")){
+        githubToken = tokenInput;
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        initializeApp();
+    } else {
+        document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
+    }
+}
+
+document.getElementById("loginButton").addEventListener("click", checkPassword);
+document.getElementById("passwordInput").addEventListener("keydown", e => {
+    if(e.key === "Enter") checkPassword();
+});
+
+/* ==========================================================
+   STATE & STORAGE
+========================================================== */
+const SEARCH_DELAY = 250;
+let mediaUrls = [];
+let workingList = [];
+let currentIndex = 0;
+let searchTimer = null;
+let observer = null;
+let observerTimeout = null;
+let recentHistory = [];
+
+const STORAGE = {
+    heartMode: "mediaViewerHeartMode",
+    swipeMode: "mediaViewerSwipeMode",
+    visited: "mediaViewerVisited"
+};
+
+let seenItems = new Set();
+let heartedItems = new Set();
+let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
+let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
+
+/* ==========================================================
+   LIVE GITHUB API SYNC (GET & PUT WITH SHA)
+========================================================== */
+async function fetchGitHubFile(path) {
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+        const res = await fetch(url, {
+            headers: { Authorization: `token ${githubToken}` }
+        });
+        if(!res.ok) return null;
+        const data = await res.json();
+        const content = JSON.parse(atob(data.content.replace(/\s/g, '')));
+        return { content, sha: data.sha };
+    } catch(e) {
+        console.error(`Error loading ${path} from GitHub:`, e);
+        return null;
+    }
+}
+
+async function saveGitHubFile(path, dataArray) {
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+        
+        // Always fetch latest SHA before updating to prevent merge conflicts
+        const existing = await fetchGitHubFile(path);
+        const sha = existing ? existing.sha : undefined;
+
+        const jsonString = JSON.stringify(dataArray, null, 2);
+        const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
+
+        const body = {
+            message: `Live update ${path} from Mobile Viewer`,
+            content: contentBase64,
+            branch: GITHUB_CONFIG.branch
+        };
+        if(sha) body.sha = sha;
+
+        const res = await fetch(url, {
+            method: "PUT",
+            headers: {
+                "Authorization": `token ${githubToken}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+        });
+
+        if(!res.ok) {
+            const errText = await res.text();
+            console.error(`GitHub Save Error for ${path}:`, errText);
+        } else {
+            console.log(`Successfully synced ${path} to GitHub.`);
+        }
+    } catch(error) {
+        console.error(`Failed to save ${path} to GitHub:`, error);
+    }
+    updateStatsDashboard();
+}
+
+async function loadServerData(){
+    const heartsRes = await fetchGitHubFile("saved_hearts.json");
+    if(heartsRes && Array.isArray(heartsRes.content)) {
+        heartedItems = new Set(heartsRes.content);
+    }
+
+    const seenRes = await fetchGitHubFile("seen_media.json");
+    if(seenRes && Array.isArray(seenRes.content)) {
+        seenItems = new Set(seenRes.content);
+    }
+
+    updateStatsDashboard();
+}
+
+async function saveHearts(){
+    await saveGitHubFile("saved_hearts.json", [...heartedItems]);
+}
+
+async function saveSeen(){
+    await saveGitHubFile("seen_media.json", [...seenItems]);
+}
+
+function saveSettings(){
+    localStorage.setItem(STORAGE.heartMode, heartMode.toString());
+    localStorage.setItem(STORAGE.swipeMode, swipeMode.toString());
+}
+
+/* ==========================================================
+   STATS DASHBOARD
+========================================================== */
+function updateStatsDashboard(){
+    const total = mediaUrls.length;
+    const seen = seenItems.size;
+    const hearts = heartedItems.size;
+    const remaining = Math.max(0, total - seen);
+    const percentage = total > 0 ? Math.round((seen / total) * 100) : 0;
+
+    const progEl = document.getElementById("statProgress");
+    const seenEl = document.getElementById("statSeen");
+    const heartsEl = document.getElementById("statHearts");
+    const remEl = document.getElementById("statRemaining");
+
+    if(progEl) progEl.textContent = percentage + "%";
+    if(seenEl) seenEl.textContent = `${seen} / ${total}`;
+    if(heartsEl) heartsEl.textContent = hearts;
+    if(remEl) remEl.textContent = remaining;
+}
+
+/* ==========================================================
+   WELCOME BANNER
+========================================================== */
+function showWelcome(){
+    const visited = localStorage.getItem(STORAGE.visited);
+    if(!visited){
+        const banner = document.getElementById("welcomeBanner");
+        banner.style.display = "block";
+        setTimeout(() => { banner.style.display = "none"; }, 5000);
+        localStorage.setItem(STORAGE.visited, "true");
+    }
+}
+
+/* ==========================================================
+   MEDIA DETECTION
+========================================================== */
+function isImage(url){
+    return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
+}
+
+function isVideo(url){
+    return /\.(mp4|webm|mov|m4v)$/i.test(url) || url.includes("video.twimg.com");
+}
+
+function normalizeImageURL(url){
+    let src = url;
+    if(src.includes("imgur.com/") && !src.includes("i.imgur.com")){
+        src = src.replace("imgur.com/", "i.imgur.com/") + ".jpg";
+    }
+    return src;
+}
+
+function createMediaElement(item){
+    let element = null;
+    if(isVideo(item.url)){
+        const video = document.createElement("video");
+        video.src = item.url;
+        video.controls = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        element = video;
+    } else if(isImage(item.url)){
+        const img = document.createElement("img");
+        img.src = normalizeImageURL(item.url);
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.onerror = () => { img.style.display = "none"; };
+        element = img;
+    }
+    return element;
+}
+
+/* ==========================================================
+   HELPERS
+========================================================== */
+function snapToTop(){
+    window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+function shuffleArray(array){
+    for(let i = array.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+/* ==========================================================
+   SEARCH SYSTEM
+========================================================== */
+function applySearch(){
+    workingList = buildDisplayList();
+    currentIndex = 0;
+    render();
+    snapToTop();
+}
+
+function debouncedSearch(){
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applySearch, SEARCH_DELAY);
+}
+
+document.getElementById("searchInput").addEventListener("input", debouncedSearch);
+
+/* ==========================================================
+   HEART SYSTEM & DOUBLE TAP SYNC
+========================================================== */
+function toggleHeart(index){
+    if(heartedItems.has(index)){
+        heartedItems.delete(index);
+    } else {
+        heartedItems.add(index);
+    }
+
+    saveHearts(); // Live GitHub sync update
+
+    document.querySelectorAll(".heart-btn").forEach(btn => {
+        if(Number(btn.dataset.index) === index){
+            const active = heartedItems.has(index);
+            btn.textContent = active ? "❤️" : "♡";
+            if(active) btn.classList.add("active");
+            else btn.classList.remove("active");
+        }
+    });
+
+    if(heartMode && !heartedItems.has(index)){
+        applySearch();
+    }
+}
+
+function handleDoubleTap(itemIndex, wrapperElement) {
+    toggleHeart(itemIndex);
+
+    const existingHeart = wrapperElement.querySelector(".floating-heart");
+    if(existingHeart) existingHeart.remove();
+
+    const heartPop = document.createElement("div");
+    heartPop.className = "floating-heart";
+    heartPop.textContent = "❤️";
+    wrapperElement.appendChild(heartPop);
+
+    setTimeout(() => { heartPop.remove(); }, 600);
+}
+
+function showHeartedOnly(){
+    heartMode = !heartMode;
+    saveSettings();
+    workingList = buildDisplayList();
+    shuffleArray(workingList);
+    currentIndex = 0;
+    render();
+    snapToTop();
+}
+
+function toggleSwipeMode(){
+    swipeMode = !swipeMode;
+    saveSettings();
+    currentIndex = 0;
+    render();
+    snapToTop();
+}
+
+/* ==========================================================
+   RECENTLY VIEWED HISTORY
+========================================================== */
+function addToHistory(item){
+    recentHistory = recentHistory.filter(i => i.index !== item.index);
+    recentHistory.unshift(item);
+    if(recentHistory.length > 20) recentHistory.pop();
+}
+
+function toggleHistoryModal(){
+    const modal = document.getElementById("historyModal");
+    modal.classList.toggle("hidden");
+    if(!modal.classList.contains("hidden")){
+        renderHistoryList();
+    }
+}
+
+function renderHistoryList(){
+    const container = document.getElementById("historyListContainer");
+    if(recentHistory.length === 0){
+        container.innerHTML = '<p style="color:#777; text-align:center;">No recent history yet.</p>';
+        return;
+    }
+
+    container.innerHTML = recentHistory.map(item => `
+        <div class="history-item" onclick="jumpToHistoryItem(${item.index})">
+            <div style="font-size:16px; margin-right:10px;">#${item.index}</div>
+            <div style="font-size:12px; color:#aaa; word-break:break-all; flex:1; text-align:left;">${item.url}</div>
+            <div style="font-size:16px; margin-left:10px;">${heartedItems.has(item.index) ? "❤️" : ""}</div>
+        </div>
+    `).join("");
+}
+
+function jumpToHistoryItem(index){
+    toggleHistoryModal();
+    const foundIndex = workingList.findIndex(item => item.index === index);
+    if(foundIndex !== -1){
+        currentIndex = foundIndex;
+    } else {
+        const item = mediaUrls.find(i => i.index === index);
+        if(item){
+            workingList.unshift(item);
+            currentIndex = 0;
+        }
+    }
+    render();
+    snapToTop();
+}
+
+/* ==========================================================
+   BUILD DISPLAY LIST
+========================================================== */
+function buildDisplayList(){
+    let list = [...mediaUrls];
+    const query = document.getElementById("searchInput").value.toLowerCase().trim();
+
+    if(query){
+        const number = query.replace("#","");
+        list = list.filter(item => item.url.toLowerCase().includes(query) || item.index.toString() === number);
+    } else if(heartMode){
+        list = list.filter(item => heartedItems.has(item.index));
+    } else {
+        list = list.filter(item => !seenItems.has(item.index));
+    }
+
+    return list;
+}
+
+/* ==========================================================
+   OBSERVER & SEEN SYNC
+========================================================== */
+function setupObserver(){
+    if(observer) observer.disconnect();
+    if(observerTimeout) clearTimeout(observerTimeout);
+
+    observerTimeout = setTimeout(() => {
+        observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting){
+                    const index = Number(entry.target.dataset.index);
+                    if(index && !heartMode && !seenItems.has(index)){
+                        seenItems.add(index);
+                        saveSeen(); // Live GitHub sync update for seen items!
+
+                        const numberEl = document.getElementById(`num-${index}`);
+                        if(numberEl && !numberEl.querySelector(".seen-badge")) {
+                            const badge = document.createElement("span");
+                            badge.className = "seen-badge";
+                            badge.style.marginLeft = "6px";
+                            badge.textContent = "👀 Seen";
+                            numberEl.appendChild(badge);
+                        }
+
+                        obs.unobserve(entry.target);
+                    }
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll(".media-container").forEach(wrapper => {
+            observer.observe(wrapper);
+        });
+    }, 1500);
+}
+
+/* ==========================================================
+   RENDER SYSTEM
+========================================================== */
+function renderControls(){
+    const html = `
+        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
+        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
+        <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+    `;
+    document.getElementById("topControls").innerHTML = html;
+    document.getElementById("bottomControls").innerHTML = html;
+}
+
+function render(){
+    renderControls();
+    updateStatsDashboard();
+
+    const container = document.getElementById("mediaContainer");
+    container.innerHTML = "";
+    document.getElementById("status").textContent = "";
+
+    const pageSize = swipeMode ? 1 : 15;
+    let shown = 0;
+    let lastTapTime = 0;
+
+    while(shown < pageSize && currentIndex < workingList.length){
+        const item = workingList[currentIndex];
+        currentIndex++;
+
+        addToHistory(item);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "media-container";
+        wrapper.dataset.index = item.index;
+
+        const number = document.createElement("div");
+        number.className = "media-number";
+        number.id = `num-${item.index}`;
+        number.textContent = "#" + item.index;
+
+        if(!heartMode && seenItems.has(item.index)){
+            number.innerHTML += ' <span class="seen-badge" style="margin-left:6px;">👀 Seen</span>';
+        }
+
+        wrapper.appendChild(number);
+
+        const heart = document.createElement("button");
+        heart.className = "heart-btn";
+        heart.dataset.index = item.index;
+
+        const isHearted = heartedItems.has(item.index);
+        heart.textContent = isHearted ? "❤️" : "♡";
+        if(isHearted) heart.classList.add("active");
+
+        heart.onclick = () => toggleHeart(item.index);
+        wrapper.appendChild(heart);
+
+        const link = document.createElement("a");
+        link.href = item.url;
+        link.target = "_blank";
+        link.textContent = item.url;
+        wrapper.appendChild(link);
+
+        const media = createMediaElement(item);
+        if(media) {
+            media.addEventListener("click", (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                if (tapLength < 300 && tapLength > 0) {
+                    e.preventDefault();
+                    handleDoubleTap(item.index, wrapper);
+                }
+                lastTapTime = currentTime;
+            });
+            wrapper.appendChild(media);
+        }
+
+        if(swipeMode){
+            const swipeActions = document.createElement("div");
+            swipeActions.className = "swipe-actions";
+            swipeActions.innerHTML = `
+                <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
+                <button class="swipe-action-btn" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
+            `;
+            wrapper.appendChild(swipeActions);
+
+            if(!heartMode && !seenItems.has(item.index)){
+                seenItems.add(item.index);
+                saveSeen(); // Live GitHub sync update
+            }
+        }
+
+        container.appendChild(wrapper);
+        shown++;
+    }
+
+    if(!swipeMode){
+        setupObserver();
+    }
+}
+
+/* ==========================================================
+   RANDOM PAGE SYSTEM
+========================================================== */
+function nextRandomPage(){
+    snapToTop();
+
+    if(heartMode){
+        if(currentIndex >= workingList.length){
+            shuffleArray(workingList);
+            currentIndex = 0;
+            document.getElementById("status").textContent = "❤️ All hearts viewed! Reshuffling hearts.";
+        }
+    } else {
+        workingList = buildDisplayList();
+        shuffleArray(workingList);
+        currentIndex = 0;
+
+        if(workingList.length === 0){
+            seenItems.clear();
+            saveSeen(); // Live GitHub sync update
+            workingList = buildDisplayList();
+            shuffleArray(workingList);
+            document.getElementById("status").textContent = "🎉 Cycle complete. Starting again.";
+        }
+    }
+
+    render();
+}
+
+/* ==========================================================
+   START APPLICATION
+========================================================== */
+async function initializeApp(){
+    try {
+        const response = await fetch("mediaNEW.json?t=" + new Date().getTime());
+        if(!response.ok) throw new Error("Could not load mediaNEW.json");
+        const data = await response.json();
+
+        mediaUrls = data.map((url, index) => ({ url: url, index: index + 1 }));
+
+        await loadServerData();
+        showWelcome();
+
+        workingList = buildDisplayList();
+        shuffleArray(workingList);
+
+        currentIndex = 0;
+        render();
+    } catch(error) {
+        document.getElementById("status").textContent = "Error: " + error.message;
+    }
+}
+</script>
+
 </body>
 </html>
