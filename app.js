@@ -38,7 +38,7 @@ let currentIndex = 0;
 let searchTimer = null;
 let observer = null;
 let observerTimeout = null;
-let recentHistory = []; // Stores recently viewed items
+let recentHistory = [];
 
 const STORAGE = {
     heartMode: "mediaViewerHeartMode",
@@ -52,7 +52,7 @@ let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
 /* ==========================================================
-   GITHUB API SAVE & LOAD FUNCTIONS
+   GITHUB API SAVE & LOAD FUNCTIONS (WITH ERROR LOGGING)
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
@@ -60,12 +60,16 @@ async function fetchGitHubFile(path) {
         const res = await fetch(url, {
             headers: { Authorization: `token ${GITHUB_CONFIG.token}` }
         });
-        if(!res.ok) return null;
+        if(!res.ok) {
+            console.error(`GitHub API Load Error for ${path}:`, res.status, res.statusText);
+            return null;
+        }
         const data = await res.json();
-        const content = JSON.parse(atob(data.content));
+        // Clean any whitespace in base64 string
+        const content = JSON.parse(atob(data.content.replace(/\s/g, '')));
         return { content, sha: data.sha };
     } catch(e) {
-        console.log(`Could not load ${path} from GitHub:`, e);
+        console.error(`Could not load ${path} from GitHub:`, e);
         return null;
     }
 }
@@ -77,7 +81,8 @@ async function saveGitHubFile(path, dataArray) {
         const existing = await fetchGitHubFile(path);
         const sha = existing ? existing.sha : undefined;
 
-        const contentBase64 = btoa(JSON.stringify(dataArray, null, 2));
+        // Safe base64 encoding
+        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(dataArray, null, 2))));
 
         const body = {
             message: `Update ${path} from Mobile Viewer`,
@@ -86,7 +91,7 @@ async function saveGitHubFile(path, dataArray) {
         };
         if(sha) body.sha = sha;
 
-        await fetch(url, {
+        const res = await fetch(url, {
             method: "PUT",
             headers: {
                 "Authorization": `token ${GITHUB_CONFIG.token}`,
@@ -94,8 +99,15 @@ async function saveGitHubFile(path, dataArray) {
             },
             body: JSON.stringify(body)
         });
+
+        if(!res.ok) {
+            const errText = await res.text();
+            console.error(`GitHub API Save Error for ${path} (${res.status}):`, errText);
+        } else {
+            console.log(`Successfully saved ${path} to GitHub.`);
+        }
     } catch(error) {
-        console.log(`Failed to save ${path} to GitHub:`, error);
+        console.error(`Failed to save ${path} to GitHub exception:`, error);
     }
     updateStatsDashboard();
 }
