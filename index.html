@@ -1,338 +1,427 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <meta name="referrer" content="no-referrer">
-<title>Media Viewer V4 - Live GitHub Sync</title>
+<title>Media Viewer V3</title>
+
 <style>
-*{ box-sizing:border-box; }
-html{ scroll-behavior:smooth; }
+*{
+    box-sizing: border-box;
+}
+html{
+    scroll-behavior: smooth;
+}
 body{
-    margin:0; padding:0; overflow-x:hidden;
-    background:#000; color:#e0e0e0;
-    font-family:Arial,Helvetica,sans-serif;
-    text-align:center; user-select:none;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background: #000;
+    color: #e0e0e0;
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+    user-select: none;
 }
-h1{ margin:15px 0; font-size:26px; font-weight:bold; }
-a{ color:#00AAFF; }
-img, video{ -webkit-user-drag:none; user-select:none; }
-
-/* DASHBOARD & STATS */
-.stats-dashboard{
-    display:flex; justify-content:space-around; background:#111;
-    padding:10px; margin-bottom:10px; border-bottom:1px solid #333; font-size:13px;
+h1{
+    margin: 15px 0;
+    font-size: 28px;
+    font-weight: bold;
 }
-.stat-box span{ display:block; font-size:16px; font-weight:bold; color:#4CAF50; }
+a{
+    color: #00AAFF;
+}
+img{
+    -webkit-user-drag: none;
+    user-select: none;
+}
 
-/* MEDIA DISPLAY */
+/* ==========================================================
+   MEDIA DISPLAY
+========================================================== */
 .media-container{
-    width:100vw; display:flex; flex-direction:column; align-items:center;
-    margin:0; padding:0 0 15px 0; position:relative;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 0 0 15px 0;
 }
-.media-container img, .media-container video{
-    width:auto; max-width:100vw; max-height:75vh; height:auto;
-    object-fit:contain; background:#000; display:block;
-    touch-action:pan-x pan-y pinch-zoom;
+.media-container img,
+.media-container video{
+    width: auto;
+    max-width: 100vw;
+    max-height: 85vh;
+    height: auto;
+    object-fit: contain;
+    background: #000;
+    display: block;
+    touch-action: pan-x pan-y pinch-zoom;
 }
-.media-number{ margin:6px 0 4px; font-size:12px; opacity:.7; display:flex; align-items:center; justify-content:center; }
-.seen-badge{ background:#27ae60; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px; }
-.media-container a{ width:95%; margin:6px 0 10px; font-size:11px; word-break:break-all; text-decoration:none; }
+.media-number{
+    margin: 6px 0 4px;
+    font-size: 12px;
+    opacity: .55;
+}
+.media-container a{
+    width: 95%;
+    margin: 6px 0 10px;
+    font-size: 11px;
+    word-break: break-all;
+    text-decoration: none;
+}
 
-/* HEART BUTTON & FLOATING HEART */
+/* ==========================================================
+   HEART BUTTON
+========================================================== */
 .heart-btn{
-    border:none; background:transparent; color:#ffffff; font-size:32px;
-    cursor:pointer; padding:0; margin:5px 0; transition:transform .15s ease; z-index:10;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    margin: 5px 0;
+    transition: transform .15s ease;
 }
-.heart-btn:hover{ transform:scale(1.15); }
-.heart-btn.active{ color:#ff2d55; }
+.heart-btn:hover{
+    transform: scale(1.15);
+}
+.heart-btn.active{
+    color: #ff2d55;
+}
 
-@keyframes floatUp {
-    0% { transform: scale(0.3) translateY(0); opacity: 1; }
-    100% { transform: scale(1.5) translateY(-80px); opacity: 0; }
-}
-.floating-heart{
-    position: absolute; font-size: 50px; pointer-events: none;
-    animation: floatUp 0.6s ease-out forwards; z-index: 50; top: 40%;
-}
-
-/* SEARCH & INPUTS */
+/* ==========================================================
+   SEARCH
+========================================================== */
 #searchInput{
-    width:90%; max-width:450px; margin:10px auto; padding:10px;
-    font-size:16px; border:none; border-radius:8px; outline:none; background:#222; color:#fff;
+    width: 90%;
+    max-width: 450px;
+    margin: 10px auto;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
 }
 
-/* BUTTONS */
+/* ==========================================================
+   BUTTONS
+========================================================== */
 button{
-    padding:10px 16px; margin:5px; font-size:14px; border:none;
-    border-radius:7px; cursor:pointer; color:#fff; background:#4CAF50; transition:background .15s ease;
+    padding: 10px 18px;
+    margin: 5px;
+    font-size: 14px;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    color: #fff;
+    background: #4CAF50;
+    transition: background .15s ease;
 }
-button:hover{ background:#45A049; }
-.random-btn{ background:#8e44ad; }
-.random-btn:hover{ background:#732d91; }
-.heart-mode-btn{ background:#e91e63; }
-.heart-mode-btn:hover{ background:#c2185b; }
-.swipe-mode-btn{ background:#2980b9; }
-.history-btn{ background:#d35400; }
-
-.controls{ width:100%; text-align:center; margin:10px 0; }
-
-/* SWIPE ACTIONS (BOTTOM OF CARD IN SWIPE MODE) */
-.swipe-actions{ display:flex; gap:10px; margin-top:8px; }
-.swipe-action-btn{ padding:8px 14px; font-size:13px; border-radius:6px; }
-
-/* HISTORY MODAL */
-#historyModal{
-    position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:8000;
-    display:flex; flex-direction:column; align-items:center; padding:20px; overflow-y:auto;
+button:hover{
+    background: #45A049;
 }
-.history-item{
-    background:#1f1f1f; width:100%; max-width:500px; padding:10px; margin:5px 0;
-    border-radius:6px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+.random-btn{
+    background: #8e44ad;
 }
-.history-item:hover{ background:#333; }
+.random-btn:hover{
+    background: #732d91;
+}
+.heart-mode-btn{
+    background: #e91e63;
+}
+.heart-mode-btn:hover{
+    background: #c2185b;
+}
+.clear-btn{
+    background: #d35400;
+}
+.clear-btn:hover{
+    background: #b84300;
+}
 
-/* STATUS */
-#status{ color:#ff6666; font-size:14px; margin:10px; min-height:20px; }
+/* ==========================================================
+   CONTROLS
+========================================================== */
+.controls{
+    width: 100%;
+    text-align: center;
+}
+#topControls{
+    margin-top: 10px;
+}
+#bottomControls{
+    padding-bottom: 25px;
+}
 
-/* WELCOME BANNER */
+/* ==========================================================
+   STATUS
+========================================================== */
+#status{
+    color: #ff6666;
+    font-size: 14px;
+    margin: 10px;
+    min-height: 20px;
+}
+
+/* ==========================================================
+   WELCOME BANNER
+========================================================== */
 #welcomeBanner{
-    position:fixed; top:20px; left:50%; transform:translateX(-50%);
-    width:90%; max-width:450px; background:#222; color:#fff; padding:15px;
-    border-radius:10px; box-shadow:0 4px 18px rgba(255,255,255,.15); display:none; z-index:9000;
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 450px;
+    background: #222;
+    color: #fff;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(255,255,255,.15);
+    display: none;
+    z-index: 9000;
 }
 
-/* LOGIN SCREEN */
+/* ==========================================================
+   LOGIN
+========================================================== */
 #loginScreen{
-    position:fixed; inset:0; background:#000; display:flex; justify-content:center; align-items:center; z-index:9999;
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
 }
-#loginBox{ background:#1f1f1f; padding:25px; border-radius:12px; width:90%; max-width:360px; }
-#passwordInput{ width:100%; padding:10px; font-size:16px; border:none; border-radius:6px; outline:none; background:#2c2c2c; color:#fff; }
-#app{ display:none; }
-.hidden{ display:none !important; }
+#loginBox{
+    background: #1f1f1f;
+    padding: 25px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 360px;
+}
+#passwordInput{
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 6px;
+    outline: none;
+}
+
+/* ==========================================================
+   APP
+========================================================== */
+#app{
+    display: none;
+}
+.hidden{
+    display: none !important;
+}
 </style>
 </head>
 
 <body>
 
-<!-- WELCOME BANNER -->
+<!-- WELCOME MESSAGE -->
 <div id="welcomeBanner">
-    ✅ Live GitHub Sync Enabled.<br><br>
-    Your hearts and seen history sync directly to your repository!
+    ✅ Tracking enabled.<br><br>
+    You will not see the same media twice<br>
+    on this device.
 </div>
 
 <!-- LOGIN SCREEN -->
 <div id="loginScreen">
     <div id="loginBox">
-        <h2>Enter GitHub Token</h2>
-        <input id="passwordInput" type="password" placeholder="ghp_... or github_pat_...">
+        <h2>Enter Access Token</h2>
+        <input id="passwordInput" type="password" placeholder="GitHub Token">
         <br><br>
-        <button id="loginButton">Connect & Load</button>
+        <button id="loginButton">Enter</button>
         <div id="loginError" style="color:red;margin-top:10px;"></div>
     </div>
 </div>
 
 <!-- APPLICATION -->
 <div id="app">
-    <h1>Media Viewer V4</h1>
-
-    <!-- STATS DASHBOARD -->
-    <div class="stats-dashboard">
-        <div class="stat-box">Progress <span id="statProgress">0%</span></div>
-        <div class="stat-box">Seen <span id="statSeen">0 / 0</span></div>
-        <div class="stat-box">Hearts <span id="statHearts">0</span></div>
-        <div class="stat-box">Remaining <span id="statRemaining">0</span></div>
-    </div>
+    <h1>Media Viewer V3</h1>
 
     <!-- SEARCH -->
-    <input id="searchInput" type="text" placeholder="Search by URL or #number...">
+    <input id="searchInput" type="text" placeholder="Search by URL or number...">
 
-    <!-- TOP CONTROLS -->
+    <!-- TOP BUTTONS -->
     <div id="topControls" class="controls"></div>
 
     <!-- STATUS -->
     <div id="status"></div>
 
-    <!-- MEDIA CONTAINER -->
+    <!-- MEDIA -->
     <div id="mediaContainer"></div>
 
-    <!-- BOTTOM CONTROLS -->
+    <!-- BOTTOM BUTTONS -->
     <div id="bottomControls" class="controls"></div>
 </div>
 
-<!-- RECENT HISTORY MODAL -->
-<div id="historyModal" class="hidden">
-    <h2 style="color:#fff; margin-top:0;">Recently Viewed History</h2>
-    <div id="historyListContainer" style="width:100%; max-width:500px; flex:1; overflow-y:auto;"></div>
-    <button onclick="toggleHistoryModal()" style="background:#e74c3c; margin-top:15px;">Close History</button>
-</div>
-
+<!-- JAVASCRIPT -->
 <script>
 /* ==========================================================
-   GITHUB CONFIGURATION
+   LOGIN SYSTEM
 ========================================================== */
-const GITHUB_CONFIG = {
-    owner: "BotTime63",
-    repo: "goldCarv2",
-    branch: "main"
-};
-let githubToken = "";
-
 function checkPassword(){
     const tokenInput = document.getElementById("passwordInput").value.trim();
+
     if(tokenInput.startsWith("ghp_") || tokenInput.startsWith("github_pat_")){
-        githubToken = tokenInput;
+        GITHUB.token = tokenInput;
         document.getElementById("loginScreen").style.display = "none";
         document.getElementById("app").style.display = "block";
         initializeApp();
     } else {
-        document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
+        document.getElementById("loginError").textContent = "Invalid token";
     }
 }
 
 document.getElementById("loginButton").addEventListener("click", checkPassword);
-document.getElementById("passwordInput").addEventListener("keydown", e => {
-    if(e.key === "Enter") checkPassword();
+document.getElementById("passwordInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") checkPassword();
 });
 
 /* ==========================================================
-   STATE & STORAGE
+   CONFIGURATION
 ========================================================== */
+const PAGE_SIZE = 15;
 const SEARCH_DELAY = 250;
+
+/* ==========================================================
+   GITHUB HEART STORAGE
+========================================================== */
+const GITHUB = {
+    token: "",
+    owner: "bottime63",
+    repo: "goldCar",
+    file: "hearts.json"
+};
+
 let mediaUrls = [];
 let workingList = [];
 let currentIndex = 0;
 let searchTimer = null;
-let observer = null;
-let observerTimeout = null;
-let recentHistory = [];
 
+/* ==========================================================
+   LOCAL STORAGE KEYS
+========================================================== */
 const STORAGE = {
+    seen: "mediaViewerSeen",
+    hearts: "mediaViewerHearts",
     heartMode: "mediaViewerHeartMode",
-    swipeMode: "mediaViewerSwipeMode",
+    random: "mediaViewerRandomState",
     visited: "mediaViewerVisited"
 };
 
-let seenItems = new Set();
+/* ==========================================================
+   LOAD SAVED DATA
+========================================================== */
+let seenItems = new Set(JSON.parse(localStorage.getItem(STORAGE.seen) || "[]"));
 let heartedItems = new Set();
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
-let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
+let randomState = JSON.parse(localStorage.getItem(STORAGE.random) || "{}");
 
 /* ==========================================================
-   LIVE GITHUB API SYNC (GET & PUT WITH SHA)
+   SAVE FUNCTIONS
 ========================================================== */
-async function fetchGitHubFile(path) {
-    try {
-        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
-        const res = await fetch(url, {
-            headers: { Authorization: `token ${githubToken}` }
-        });
-        if(!res.ok) return null;
-        const data = await res.json();
-        const content = JSON.parse(atob(data.content.replace(/\s/g, '')));
-        return { content, sha: data.sha };
-    } catch(e) {
-        console.error(`Error loading ${path} from GitHub:`, e);
-        return null;
-    }
+function saveSeen(){
+    localStorage.setItem(STORAGE.seen, JSON.stringify([...seenItems]));
 }
 
-async function saveGitHubFile(path, dataArray) {
-    try {
-        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
-        
-        // Always fetch latest SHA before updating to prevent merge conflicts
-        const existing = await fetchGitHubFile(path);
-        const sha = existing ? existing.sha : undefined;
+async function loadGithubHearts(){
+    try{
+        const response = await fetch(
+            `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.file}`,
+            {
+                headers: {
+                    Authorization: `token ${GITHUB.token}`
+                }
+            }
+        );
 
-        const jsonString = JSON.stringify(dataArray, null, 2);
-        const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
+        if (!response.ok) throw new Error("Failed to fetch hearts from GitHub");
 
-        const body = {
-            message: `Live update ${path} from Mobile Viewer`,
-            content: contentBase64,
-            branch: GITHUB_CONFIG.branch
-        };
-        if(sha) body.sha = sha;
-
-        const res = await fetch(url, {
-            method: "PUT",
-            headers: {
-                "Authorization": `token ${githubToken}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(body)
-        });
-
-        if(!res.ok) {
-            const errText = await res.text();
-            console.error(`GitHub Save Error for ${path}:`, errText);
-        } else {
-            console.log(`Successfully synced ${path} to GitHub.`);
-        }
-    } catch(error) {
-        console.error(`Failed to save ${path} to GitHub:`, error);
+        const data = await response.json();
+        const content = atob(data.content);
+        heartedItems = new Set(JSON.parse(content));
+        console.log("Loaded GitHub hearts:", heartedItems);
+    } catch(error){
+        console.log("GitHub heart loading failed:", error);
     }
-    updateStatsDashboard();
-}
-
-async function loadServerData(){
-    const heartsRes = await fetchGitHubFile("saved_hearts.json");
-    if(heartsRes && Array.isArray(heartsRes.content)) {
-        heartedItems = new Set(heartsRes.content);
-    }
-
-    const seenRes = await fetchGitHubFile("seen_media.json");
-    if(seenRes && Array.isArray(seenRes.content)) {
-        seenItems = new Set(seenRes.content);
-    }
-
-    updateStatsDashboard();
 }
 
 async function saveHearts(){
-    await saveGitHubFile("saved_hearts.json", [...heartedItems]);
-}
+    try {
+        const fileResponse = await fetch(
+            `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.file}`,
+            {
+                headers: {
+                    Authorization: `token ${GITHUB.token}`
+                }
+            }
+        );
 
-async function saveSeen(){
-    await saveGitHubFile("seen_media.json", [...seenItems]);
+        const fileData = await fileResponse.json();
+        if(!fileResponse.ok){
+            console.log("GitHub error:", fileData);
+            return;
+        }
+
+        const content = JSON.stringify([...heartedItems], null, 2);
+
+        await fetch(
+            `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}/contents/${GITHUB.file}`,
+            {
+                method: "PUT",
+                headers: {
+                    Authorization: `token ${GITHUB.token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    message: "Update hearts",
+                    content: btoa(content),
+                    sha: fileData.sha
+                })
+            }
+        );
+    } catch (error) {
+        console.error("Failed to save hearts to GitHub:", error);
+    }
 }
 
 function saveSettings(){
     localStorage.setItem(STORAGE.heartMode, heartMode.toString());
-    localStorage.setItem(STORAGE.swipeMode, swipeMode.toString());
+}
+
+function saveRandomState(){
+    localStorage.setItem(STORAGE.random, JSON.stringify(randomState));
+}
+
+function saveAll(){
+    saveSeen();
+    saveHearts();
+    saveSettings();
+    saveRandomState();
 }
 
 /* ==========================================================
-   STATS DASHBOARD
-========================================================== */
-function updateStatsDashboard(){
-    const total = mediaUrls.length;
-    const seen = seenItems.size;
-    const hearts = heartedItems.size;
-    const remaining = Math.max(0, total - seen);
-    const percentage = total > 0 ? Math.round((seen / total) * 100) : 0;
-
-    const progEl = document.getElementById("statProgress");
-    const seenEl = document.getElementById("statSeen");
-    const heartsEl = document.getElementById("statHearts");
-    const remEl = document.getElementById("statRemaining");
-
-    if(progEl) progEl.textContent = percentage + "%";
-    if(seenEl) seenEl.textContent = `${seen} / ${total}`;
-    if(heartsEl) heartsEl.textContent = hearts;
-    if(remEl) remEl.textContent = remaining;
-}
-
-/* ==========================================================
-   WELCOME BANNER
+   FIRST VISIT MESSAGE
 ========================================================== */
 function showWelcome(){
     const visited = localStorage.getItem(STORAGE.visited);
     if(!visited){
         const banner = document.getElementById("welcomeBanner");
         banner.style.display = "block";
-        setTimeout(() => { banner.style.display = "none"; }, 5000);
+        setTimeout(()=>{
+            banner.style.display = "none";
+        }, 5000);
         localStorage.setItem(STORAGE.visited, "true");
     }
 }
@@ -341,11 +430,18 @@ function showWelcome(){
    MEDIA DETECTION
 ========================================================== */
 function isImage(url){
-    return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
+    return (
+        /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) ||
+        url.includes("pbs.twimg.com") ||
+        url.includes("abs.twimg.com")
+    );
 }
 
 function isVideo(url){
-    return /\.(mp4|webm|mov|m4v)$/i.test(url) || url.includes("video.twimg.com");
+    return (
+        /\.(mp4|webm|mov|m4v)$/i.test(url) ||
+        url.includes("video.twimg.com")
+    );
 }
 
 function normalizeImageURL(url){
@@ -358,21 +454,25 @@ function normalizeImageURL(url){
 
 function createMediaElement(item){
     let element = null;
+
     if(isVideo(item.url)){
         const video = document.createElement("video");
         video.src = item.url;
         video.controls = true;
         video.playsInline = true;
         video.preload = "metadata";
+        video.onloadeddata = () => { markAsSeen(item); };
         element = video;
     } else if(isImage(item.url)){
         const img = document.createElement("img");
         img.src = normalizeImageURL(item.url);
-        img.loading = "lazy";
+        img.loading = "auto";
         img.decoding = "async";
+        img.onload = () => { markAsSeen(item); };
         img.onerror = () => { img.style.display = "none"; };
         element = img;
     }
+
     return element;
 }
 
@@ -380,7 +480,10 @@ function createMediaElement(item){
    HELPERS
 ========================================================== */
 function snapToTop(){
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
 }
 
 function shuffleArray(array){
@@ -406,10 +509,8 @@ function debouncedSearch(){
     searchTimer = setTimeout(applySearch, SEARCH_DELAY);
 }
 
-document.getElementById("searchInput").addEventListener("input", debouncedSearch);
-
 /* ==========================================================
-   HEART SYSTEM & DOUBLE TAP SYNC
+   HEART SYSTEM
 ========================================================== */
 function toggleHeart(index){
     if(heartedItems.has(index)){
@@ -418,14 +519,18 @@ function toggleHeart(index){
         heartedItems.add(index);
     }
 
-    saveHearts(); // Live GitHub sync update
+    saveHearts();
 
-    document.querySelectorAll(".heart-btn").forEach(btn => {
+    const buttons = document.querySelectorAll(".heart-btn");
+    buttons.forEach(btn=>{
         if(Number(btn.dataset.index) === index){
             const active = heartedItems.has(index);
             btn.textContent = active ? "❤️" : "♡";
-            if(active) btn.classList.add("active");
-            else btn.classList.remove("active");
+            if(active){
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
         }
     });
 
@@ -434,85 +539,26 @@ function toggleHeart(index){
     }
 }
 
-function handleDoubleTap(itemIndex, wrapperElement) {
-    toggleHeart(itemIndex);
-
-    const existingHeart = wrapperElement.querySelector(".floating-heart");
-    if(existingHeart) existingHeart.remove();
-
-    const heartPop = document.createElement("div");
-    heartPop.className = "floating-heart";
-    heartPop.textContent = "❤️";
-    wrapperElement.appendChild(heartPop);
-
-    setTimeout(() => { heartPop.remove(); }, 600);
-}
-
 function showHeartedOnly(){
     heartMode = !heartMode;
     saveSettings();
     workingList = buildDisplayList();
-    shuffleArray(workingList);
     currentIndex = 0;
     render();
     snapToTop();
 }
 
-function toggleSwipeMode(){
-    swipeMode = !swipeMode;
-    saveSettings();
-    currentIndex = 0;
-    render();
-    snapToTop();
-}
-
-/* ==========================================================
-   RECENTLY VIEWED HISTORY
-========================================================== */
-function addToHistory(item){
-    recentHistory = recentHistory.filter(i => i.index !== item.index);
-    recentHistory.unshift(item);
-    if(recentHistory.length > 20) recentHistory.pop();
-}
-
-function toggleHistoryModal(){
-    const modal = document.getElementById("historyModal");
-    modal.classList.toggle("hidden");
-    if(!modal.classList.contains("hidden")){
-        renderHistoryList();
-    }
-}
-
-function renderHistoryList(){
-    const container = document.getElementById("historyListContainer");
-    if(recentHistory.length === 0){
-        container.innerHTML = '<p style="color:#777; text-align:center;">No recent history yet.</p>';
+function clearHearts(){
+    if(!confirm("Clear all hearts?")){
         return;
     }
-
-    container.innerHTML = recentHistory.map(item => `
-        <div class="history-item" onclick="jumpToHistoryItem(${item.index})">
-            <div style="font-size:16px; margin-right:10px;">#${item.index}</div>
-            <div style="font-size:12px; color:#aaa; word-break:break-all; flex:1; text-align:left;">${item.url}</div>
-            <div style="font-size:16px; margin-left:10px;">${heartedItems.has(item.index) ? "❤️" : ""}</div>
-        </div>
-    `).join("");
-}
-
-function jumpToHistoryItem(index){
-    toggleHistoryModal();
-    const foundIndex = workingList.findIndex(item => item.index === index);
-    if(foundIndex !== -1){
-        currentIndex = foundIndex;
-    } else {
-        const item = mediaUrls.find(i => i.index === index);
-        if(item){
-            workingList.unshift(item);
-            currentIndex = 0;
-        }
-    }
-    render();
-    snapToTop();
+    heartedItems.clear();
+    saveHearts();
+    const buttons = document.querySelectorAll(".heart-btn");
+    buttons.forEach(btn=>{
+        btn.textContent = "♡";
+        btn.classList.remove("active");
+    });
 }
 
 /* ==========================================================
@@ -523,52 +569,31 @@ function buildDisplayList(){
     const query = document.getElementById("searchInput").value.toLowerCase().trim();
 
     if(query){
-        const number = query.replace("#","");
-        list = list.filter(item => item.url.toLowerCase().includes(query) || item.index.toString() === number);
-    } else if(heartMode){
-        list = list.filter(item => heartedItems.has(item.index));
+        const number = query.replace("#", "");
+        list = list.filter(item =>
+            item.url.toLowerCase().includes(query) ||
+            item.index.toString() === number
+        );
     } else {
         list = list.filter(item => !seenItems.has(item.index));
     }
 
+    if(heartMode){
+        list = list.filter(item => heartedItems.has(item.index));
+    }
+
+    shuffleArray(list);
     return list;
 }
 
 /* ==========================================================
-   OBSERVER & SEEN SYNC
+   TRACK VIEWED MEDIA
 ========================================================== */
-function setupObserver(){
-    if(observer) observer.disconnect();
-    if(observerTimeout) clearTimeout(observerTimeout);
-
-    observerTimeout = setTimeout(() => {
-        observer = new IntersectionObserver((entries, obs) => {
-            entries.forEach(entry => {
-                if(entry.isIntersecting){
-                    const index = Number(entry.target.dataset.index);
-                    if(index && !heartMode && !seenItems.has(index)){
-                        seenItems.add(index);
-                        saveSeen(); // Live GitHub sync update for seen items!
-
-                        const numberEl = document.getElementById(`num-${index}`);
-                        if(numberEl && !numberEl.querySelector(".seen-badge")) {
-                            const badge = document.createElement("span");
-                            badge.className = "seen-badge";
-                            badge.style.marginLeft = "6px";
-                            badge.textContent = "👀 Seen";
-                            numberEl.appendChild(badge);
-                        }
-
-                        obs.unobserve(entry.target);
-                    }
-                }
-            });
-        }, { threshold: 0.5 });
-
-        document.querySelectorAll(".media-container").forEach(wrapper => {
-            observer.observe(wrapper);
-        });
-    }, 1500);
+function markAsSeen(item){
+    if(item && item.index){
+        seenItems.add(item.index);
+        saveSeen();
+    }
 }
 
 /* ==========================================================
@@ -576,46 +601,36 @@ function setupObserver(){
 ========================================================== */
 function renderControls(){
     const html = `
-        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
-        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
-        <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+        <button class="random-btn" onclick="nextRandomPage()">🎲 Random Page</button>
+        <button class="heart-mode-btn" onclick="showHeartedOnly()">
+            ${heartMode ? "❤️ Showing Hearts" : "♡ Hearts"}
+        </button>
+        <button class="clear-btn" onclick="clearHearts()">🗑 Clear Hearts</button>
     `;
+
     document.getElementById("topControls").innerHTML = html;
     document.getElementById("bottomControls").innerHTML = html;
 }
 
 function render(){
     renderControls();
-    updateStatsDashboard();
 
     const container = document.getElementById("mediaContainer");
     container.innerHTML = "";
     document.getElementById("status").textContent = "";
 
-    const pageSize = swipeMode ? 1 : 15;
     let shown = 0;
-    let lastTapTime = 0;
 
-    while(shown < pageSize && currentIndex < workingList.length){
+    while(shown < PAGE_SIZE && currentIndex < workingList.length){
         const item = workingList[currentIndex];
         currentIndex++;
 
-        addToHistory(item);
-
         const wrapper = document.createElement("div");
         wrapper.className = "media-container";
-        wrapper.dataset.index = item.index;
 
         const number = document.createElement("div");
         number.className = "media-number";
-        number.id = `num-${item.index}`;
         number.textContent = "#" + item.index;
-
-        if(!heartMode && seenItems.has(item.index)){
-            number.innerHTML += ' <span class="seen-badge" style="margin-left:6px;">👀 Seen</span>';
-        }
-
         wrapper.appendChild(number);
 
         const heart = document.createElement("button");
@@ -624,9 +639,14 @@ function render(){
 
         const isHearted = heartedItems.has(item.index);
         heart.textContent = isHearted ? "❤️" : "♡";
-        if(isHearted) heart.classList.add("active");
+        if(isHearted){
+            heart.classList.add("active");
+        }
 
-        heart.onclick = () => toggleHeart(item.index);
+        heart.onclick = ()=>{
+            toggleHeart(item.index);
+        };
+
         wrapper.appendChild(heart);
 
         const link = document.createElement("a");
@@ -635,41 +655,14 @@ function render(){
         link.textContent = item.url;
         wrapper.appendChild(link);
 
+        markAsSeen(item);
         const media = createMediaElement(item);
-        if(media) {
-            media.addEventListener("click", (e) => {
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTapTime;
-                if (tapLength < 300 && tapLength > 0) {
-                    e.preventDefault();
-                    handleDoubleTap(item.index, wrapper);
-                }
-                lastTapTime = currentTime;
-            });
+        if(media){
             wrapper.appendChild(media);
-        }
-
-        if(swipeMode){
-            const swipeActions = document.createElement("div");
-            swipeActions.className = "swipe-actions";
-            swipeActions.innerHTML = `
-                <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
-                <button class="swipe-action-btn" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
-            `;
-            wrapper.appendChild(swipeActions);
-
-            if(!heartMode && !seenItems.has(item.index)){
-                seenItems.add(item.index);
-                saveSeen(); // Live GitHub sync update
-            }
         }
 
         container.appendChild(wrapper);
         shown++;
-    }
-
-    if(!swipeMode){
-        setupObserver();
     }
 }
 
@@ -677,53 +670,64 @@ function render(){
    RANDOM PAGE SYSTEM
 ========================================================== */
 function nextRandomPage(){
-    snapToTop();
+    workingList = buildDisplayList();
+    shuffleArray(workingList);
+    currentIndex = 0;
 
-    if(heartMode){
-        if(currentIndex >= workingList.length){
-            shuffleArray(workingList);
-            currentIndex = 0;
-            document.getElementById("status").textContent = "❤️ All hearts viewed! Reshuffling hearts.";
-        }
-    } else {
+    if(workingList.length === 0){
+        seenItems.clear();
+        saveSeen();
         workingList = buildDisplayList();
         shuffleArray(workingList);
-        currentIndex = 0;
-
-        if(workingList.length === 0){
-            seenItems.clear();
-            saveSeen(); // Live GitHub sync update
-            workingList = buildDisplayList();
-            shuffleArray(workingList);
-            document.getElementById("status").textContent = "🎉 Cycle complete. Starting again.";
-        }
+        document.getElementById("status").textContent = "🎉 Cycle complete. Starting again.";
     }
 
     render();
+    snapToTop();
 }
+
+/* ==========================================================
+   BOTTOM BUTTON BEHAVIOR
+========================================================== */
+function setupBottomButtons(){
+    document.getElementById("bottomControls").addEventListener("click", ()=>{
+        setTimeout(snapToTop, 100);
+    });
+}
+
+/* ==========================================================
+   SEARCH LISTENER
+========================================================== */
+document.getElementById("searchInput").addEventListener("input", debouncedSearch);
 
 /* ==========================================================
    START APPLICATION
 ========================================================== */
-async function initializeApp(){
-    try {
-        const response = await fetch("mediaNEW.json?t=" + new Date().getTime());
-        if(!response.ok) throw new Error("Could not load mediaNEW.json");
-        const data = await response.json();
+function initializeApp(){
+    fetch("mediaNEW.json")
+    .then(response=>{
+        if(!response.ok){
+            throw new Error("Could not load mediaNEW.json");
+        }
+        return response.json();
+    })
+    .then(async data=>{
+        mediaUrls = data.map((url, index)=>({
+            url: url,
+            index: index + 1
+        }));
 
-        mediaUrls = data.map((url, index) => ({ url: url, index: index + 1 }));
-
-        await loadServerData();
+        await loadGithubHearts();
         showWelcome();
+        setupBottomButtons();
 
         workingList = buildDisplayList();
-        shuffleArray(workingList);
-
         currentIndex = 0;
         render();
-    } catch(error) {
+    })
+    .catch(error=>{
         document.getElementById("status").textContent = "Error: " + error.message;
-    }
+    });
 }
 </script>
 
