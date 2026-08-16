@@ -2,27 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <meta name="referrer" content="no-referrer">
+
+<!-- PWA / iOS App Mode Meta Tags -->
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
-<title>Media Viewer</title>
+
+<title>Media Viewer V4.3 - GitHub Sync</title>
 
 <style>
 * {
     box-sizing: border-box;
-}
-
-html,
-body {
-    margin: 0;
-    padding: 0;
-    background: #000;
-    color: #e0e0e0;
-    font-family: Arial, Helvetica, sans-serif;
-    text-align: center;
 }
 
 html {
@@ -31,300 +24,84 @@ html {
 }
 
 body {
+    margin: 0;
+    padding: 0;
     overflow-x: hidden;
+    background: #000;
+    color: #e0e0e0;
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
     user-select: none;
-    -webkit-touch-callout: default;
-    -webkit-tap-highlight-color: transparent;
-}
-
-body.swipe-mode {
-    overflow: hidden;
-}
-
-#app {
-    display: none;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    -webkit-touch-callout: default; /* Allows iOS long-press menu to save media */
 }
 
 h1 {
-    margin: 12px 0 8px;
-    font-size: 24px;
+    margin: 15px 0 10px;
+    font-size: 26px;
+    font-weight: bold;
 }
 
 a {
-    color: #00aaff;
+    color: #00AAFF;
 }
 
-img,
-video {
+img, video {
     user-select: auto;
 }
 
-/* Login */
-
-#loginScreen {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #000;
-    padding: 20px;
-}
-
-#loginBox {
-    width: 100%;
-    max-width: 360px;
-    padding: 25px;
-    background: #1f1f1f;
-    border-radius: 12px;
-}
-
-#loginBox h2 {
-    margin-top: 0;
-}
-
-#passwordInput {
-    width: 100%;
-    padding: 10px;
-    border: 0;
-    border-radius: 6px;
-    outline: 0;
-    font-size: 16px;
-}
-
-#loginError {
-    margin-top: 10px;
-    color: #ff4444;
-}
-
-/* Search */
-
-#searchInput {
-    display: block;
-    width: 90%;
-    max-width: 450px;
-    margin: 5px auto 10px;
-    padding: 10px;
-    border: 0;
-    border-radius: 8px;
-    outline: 0;
-    font-size: 16px;
-}
-
-/* Stats */
-
-.stats-dashboard {
-    display: flex;
-    width: 90%;
-    max-width: 450px;
-    margin: 0 auto 12px;
-    padding: 10px 5px;
-    background: #121212;
-    border: 1px solid #222;
-    border-radius: 10px;
-}
-
-.stat-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.stat-label {
-    margin-bottom: 3px;
-    color: #888;
-    font-size: 10px;
-    text-transform: uppercase;
-}
-
-.stat-value {
-    color: #fff;
-    font-size: 13px;
-    font-weight: bold;
-}
-
-/* Controls */
-
-.controls {
-    width: 100%;
-    text-align: center;
-}
-
-#topControls {
-    margin-top: 5px;
-}
-
-.mobile-control-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    width: 95%;
-    max-width: 520px;
-    margin: 0 auto 8px;
-}
-
-.control-left {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-}
-
-.random-control {
-    display: flex;
-}
-
-.random-btn {
-    width: 100%;
-    min-height: 86px;
-    margin: 0;
-    border-radius: 14px;
-    background: #8e44ad;
-    font-size: 21px;
-    font-weight: bold;
-}
-
-.random-btn:hover {
-    background: #9b59b6;
-}
-
-.secondary-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    width: 95%;
-    max-width: 520px;
-    margin: 0 auto 8px;
-}
-
-.secondary-controls button {
-    flex: 1 1 auto;
-    min-width: 105px;
-}
-
-.secondary-controls select {
-    padding: 8px 9px;
-    border: 1px solid #444;
-    border-radius: 7px;
-    background: #222;
-    color: #fff;
-    font-size: 12px;
-}
-
-button {
-    margin: 3px;
-    padding: 9px 14px;
-    border: 0;
-    border-radius: 7px;
-    background: #4caf50;
-    color: #fff;
-    font-size: 12px;
-    cursor: pointer;
-    transition: .15s ease;
-}
-
-button:hover {
-    opacity: .9;
-}
-
-button:active {
-    transform: scale(.96);
-}
-
-.history-btn {
-    background: #34495e;
-}
-
-.swipe-mode-btn {
-    background: #2980b9;
-}
-
-.heart-mode-btn {
-    background: #e91e63;
-}
-
-.sync-btn {
-    background: #27ae60;
-    font-weight: bold;
-}
-
-.autoplay-btn {
-    background: #16a085;
-    font-weight: bold;
-}
-
-/* Status */
-
-#status {
-    min-height: 20px;
-    margin: 8px 10px;
-    color: #ff6666;
-    font-size: 14px;
-}
-
 /* Media */
-
-#mediaContainer {
-    width: 100%;
-}
-
 .media-container {
-    position: relative;
+    width: 100vw;
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 100vw;
     margin: 0;
     padding: 0 0 15px;
+    position: relative;
     touch-action: pan-y;
 }
 
 .media-container img,
 .media-container video {
-    display: block;
     width: auto;
     max-width: 100vw;
-    max-height: 75vh;
+    max-height: 72vh;
     height: auto;
-    background: #000;
     object-fit: contain;
+    background: #000;
+    display: block;
+    touch-action: pan-x pan-y pinch-zoom; /* Enables smooth pinch-to-zoom */
     cursor: pointer;
-    touch-action: pan-x pan-y pinch-zoom;
+    -webkit-touch-callout: default !important; /* Ensures iOS long press works on media */
 }
 
 .media-number {
     margin: 6px 0 4px;
-    opacity: .55;
     font-size: 12px;
+    opacity: .55;
 }
 
-.media-container > a {
+.media-container a {
     width: 95%;
     margin: 6px 0 10px;
     font-size: 11px;
-    text-decoration: none;
     word-break: break-all;
+    text-decoration: none;
 }
 
-/* Hearts */
-
+/* Heart */
 .heart-btn {
-    margin: 5px 0;
-    padding: 0;
+    border: none;
     background: transparent;
     color: #fff;
     font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    margin: 5px 0;
+    transition: transform .15s ease;
 }
 
 .heart-btn:hover {
-    background: transparent;
     transform: scale(1.15);
 }
 
@@ -332,366 +109,258 @@ button:active {
     color: #ff2d55;
 }
 
+/* Floating Double-Tap Heart Animation */
 .floating-heart {
     position: absolute;
     top: 50%;
     left: 50%;
-    z-index: 50;
     transform: translate(-50%, -50%) scale(0);
-    color: #ff2d55;
     font-size: 90px;
+    color: #ff2d55;
     pointer-events: none;
-    filter: drop-shadow(0 4px 12px rgba(0,0,0,.6));
-    animation: popHeart .6s ease-out forwards;
+    z-index: 50;
+    animation: popHeart 0.6s ease-out forwards;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6));
 }
 
 @keyframes popHeart {
-    0% {
-        transform: translate(-50%, -50%) scale(0);
-        opacity: 0;
-    }
-
-    30% {
-        transform: translate(-50%, -50%) scale(1.2);
-        opacity: 1;
-    }
-
-    60% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-    }
-
-    100% {
-        transform: translate(-50%, -50%) scale(1.4);
-        opacity: 0;
-    }
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    60% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
 }
 
-/* Seen */
-
-.seen-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 3px 7px;
-    border: 1px solid rgba(46,204,113,.45);
-    border-radius: 999px;
-    background: rgba(46,204,113,.16);
-    color: #2ecc71;
-    font-size: 10px;
-    font-weight: bold;
-    vertical-align: middle;
+/* Search */
+#searchInput {
+    width: 90%;
+    max-width: 450px;
+    margin: 5px auto 10px;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
 }
 
-/* Swipe mode */
+/* Stats Dashboard */
+.stats-dashboard {
+    display: flex;
+    justify-content: space-around;
+    background: #121212;
+    border: 1px solid #222;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 450px;
+    margin: 0 auto 15px;
+    padding: 10px 5px;
+}
 
-body.swipe-mode #app {
-    display: flex !important;
+.stat-item {
+    display: flex;
     flex-direction: column;
-    height: 100svh;
-    min-height: 100svh;
-    overflow: hidden;
-}
-
-body.swipe-mode h1 {
-    flex-shrink: 0;
-    margin: 5px 0 2px;
-    font-size: 20px;
-}
-
-body.swipe-mode #searchInput,
-body.swipe-mode #statsDashboard,
-body.swipe-mode #topControls,
-body.swipe-mode #bottomControls,
-body.swipe-mode #status {
-    flex-shrink: 0;
-}
-
-body.swipe-mode #searchInput {
-    margin: 3px auto 5px;
-}
-
-body.swipe-mode #statsDashboard {
-    margin-bottom: 4px;
-}
-
-body.swipe-mode #status {
-    min-height: 18px;
-    margin: 2px 10px;
-}
-
-body.swipe-mode #mediaContainer {
-    display: flex;
+    align-items: center;
     flex: 1;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    min-height: 0;
-    overflow: hidden;
 }
 
-body.swipe-mode .media-container {
+.stat-label {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-size: 13px;
+    font-weight: bold;
+    color: #fff;
+}
+
+/* Buttons */
+button {
+    padding: 10px 16px;
+    margin: 4px;
+    font-size: 13px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #fff;
+    background: #4CAF50;
+    transition: background .15s ease, transform .1s ease;
+}
+
+button:active {
+    transform: scale(0.96);
+}
+
+button:hover {
+    background: #45A049;
+}
+
+.random-btn { background: #8e44ad; font-weight: bold; font-size: 14px; padding: 11px 18px; }
+.heart-mode-btn { background: #e91e63; }
+.swipe-mode-btn { background: #2980b9; }
+.history-btn { background: #34495e; }
+.sync-btn { background: #27ae60; font-weight: bold; }
+.autoplay-btn { background: #16a085; font-weight: bold; }
+
+/* Floating Right-Hand Mega Random Button for One-Handed Use */
+.floating-fab {
+    position: fixed;
+    bottom: 25px;
+    right: 20px;
+    background: #8e44ad;
+    color: #fff;
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
     display: flex;
-    align-items: center;
     justify-content: center;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    padding: 5px 10px;
-    overflow: hidden;
+    align-items: center;
+    font-size: 26px;
+    box-shadow: 0 6px 20px rgba(142, 68, 173, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    z-index: 8000;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+.floating-fab:active {
+    transform: scale(0.9);
 }
 
-body.swipe-mode .media-container img,
-body.swipe-mode .media-container video {
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-}
-
-body.swipe-mode .media-container > a {
-    display: none;
-}
-
-body.swipe-mode .media-number {
-    position: absolute;
-    top: 5px;
-    left: 10px;
-    right: 10px;
-    z-index: 5;
-    margin: 0;
-    font-size: 11px;
-    pointer-events: none;
-}
-
-body.swipe-mode .heart-btn {
-    position: absolute;
-    top: 32px;
-    right: 15px;
-    z-index: 10;
-    margin: 0;
-    padding: 4px 8px;
-    font-size: 34px;
-}
-
+/* Swipe Mode Action Bar */
 .swipe-actions {
     display: flex;
     justify-content: center;
-    gap: 10px;
-    margin: 10px 0 20px;
+    gap: 12px;
+    margin: 12px 0 20px;
 }
-
-body.swipe-mode .swipe-actions {
-    position: absolute;
-    right: 10px;
-    bottom: 8px;
-    left: 10px;
-    z-index: 10;
-    margin: 0;
-}
-
 .swipe-action-btn {
-    min-width: 120px;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-size: 14px;
+    padding: 13px 22px;
+    font-size: 15px;
     font-weight: bold;
+    border-radius: 10px;
 }
 
-/* History */
-
+/* History Modal */
 #historyModal {
     position: fixed;
     inset: 0;
+    background: rgba(0, 0, 0, 0.94);
     z-index: 9500;
-    padding: calc(15px + env(safe-area-inset-top)) 12px calc(20px + env(safe-area-inset-bottom));
+    padding: 20px;
     overflow-y: auto;
-    background: rgba(0,0,0,.94);
     text-align: left;
 }
-
-.history-modal-inner {
-    width: 100%;
-    max-width: 520px;
-    margin: 0 auto;
-}
-
-.history-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #333;
-}
-
-.history-header h3 {
-    margin: 0;
-    font-size: 18px;
-}
-
-.history-close-btn {
-    flex-shrink: 0;
-    margin: 0;
-    padding: 7px 12px;
-    background: #c0392b;
-}
-
 .history-item {
     display: flex;
     align-items: center;
-    min-height: 70px;
-    margin-bottom: 8px;
-    padding: 8px;
-    border: 1px solid #222;
-    border-radius: 10px;
     background: #151515;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid #222;
     cursor: pointer;
+    transition: background 0.15s ease;
 }
-
 .history-item:hover {
     background: #222;
 }
 
-.history-thumbnail,
-.history-thumbnail-placeholder {
-    width: 64px;
-    height: 64px;
-    flex: 0 0 64px;
-    border: 1px solid #333;
-    border-radius: 7px;
-    background: #000;
-    object-fit: cover;
-}
-
-.history-thumbnail-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0c0c0c;
-    color: #666;
-    font-size: 24px;
-}
-
-.history-info {
-    min-width: 0;
-    flex: 1;
-    margin-left: 10px;
-}
-
-.history-number {
-    margin-bottom: 3px;
-    color: #fff;
-    font-size: 13px;
-    font-weight: bold;
-}
-
-.history-url {
-    color: #777;
-    font-size: 10px;
-    line-height: 1.3;
-    word-break: break-all;
-}
-
-.history-heart {
-    flex-shrink: 0;
-    margin-left: 8px;
-    font-size: 18px;
-}
-
-/* Footer */
-
+/* Safe Footer Clear Button */
 .footer-container {
+    margin: 40px 0 80px;
+    padding-top: 20px;
+    border-top: 1px solid #222;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    margin: 40px 0 60px;
-    padding-top: 20px;
-    border-top: 1px solid #222;
-}
-
-.clear-btn,
-.logout-btn {
-    background: transparent;
-    border: 1px dashed;
 }
 
 .clear-btn {
-    border-color: #ff6b6b;
+    background: transparent;
     color: #ff6b6b;
-    opacity: .8;
+    border: 1px dashed #ff6b6b;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    opacity: 0.8;
 }
 
 .logout-btn {
-    border-color: #555;
+    background: transparent;
     color: #888;
+    border: 1px dashed #555;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 6px;
 }
 
-.clear-btn:hover,
-.logout-btn:hover {
-    background: rgba(255,255,255,.05);
-    opacity: 1;
+/* Controls */
+.controls {
+    width: 100%;
+    text-align: center;
 }
 
-.hidden {
-    display: none !important;
+#topControls { margin-top: 5px; }
+#bottomControls { padding-bottom: 10px; }
+
+/* Status */
+#status {
+    color: #ff6666;
+    font-size: 14px;
+    margin: 10px;
+    min-height: 20px;
 }
 
-/* Small phones */
-
-@media (max-width: 380px) {
-    h1 {
-        font-size: 22px;
-    }
-
-    .mobile-control-layout {
-        gap: 5px;
-    }
-
-    .random-btn {
-        min-height: 78px;
-        font-size: 18px;
-    }
-
-    .control-left button {
-        padding: 8px 9px;
-        font-size: 11px;
-    }
-
-    .stats-dashboard {
-        width: 96%;
-    }
-
-    .stat-label {
-        font-size: 9px;
-    }
-
-    .stat-value {
-        font-size: 12px;
-    }
+/* Welcome */
+#welcomeBanner {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 450px;
+    background: #222;
+    color: #fff;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(255, 255, 255, .15);
+    display: none;
+    z-index: 9000;
 }
 
-/* Larger screens */
-
-@media (min-width: 700px) {
-    .mobile-control-layout,
-    .secondary-controls {
-        max-width: 650px;
-    }
-
-    .random-btn {
-        min-height: 95px;
-    }
-
-    .history-thumbnail,
-    .history-thumbnail-placeholder {
-        width: 76px;
-        height: 76px;
-        flex-basis: 76px;
-    }
+/* Login */
+#loginScreen {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
 }
+
+#loginBox {
+    background: #1f1f1f;
+    padding: 25px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 360px;
+}
+
+#passwordInput {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 6px;
+    outline: none;
+}
+
+#app { display: none; }
+.hidden { display: none !important; }
 </style>
 </head>
 
@@ -703,13 +372,12 @@ body.swipe-mode .swipe-actions {
     on this device.
 </div>
 
+<!-- History Modal -->
 <div id="historyModal" class="hidden">
-    <div class="history-modal-inner">
-        <div class="history-header">
-            <h3>🕒 Recently Viewed History</h3>
-            <button class="history-close-btn" onclick="toggleHistoryModal()">
-                Close ✕
-            </button>
+    <div style="max-width:450px; margin:0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
+            <h3 style="margin:0;">🕒 Recently Viewed History</h3>
+            <button onclick="toggleHistoryModal()" style="background:#c0392b; padding:6px 12px;">Close ✕</button>
         </div>
         <div id="historyListContainer"></div>
     </div>
@@ -718,55 +386,35 @@ body.swipe-mode .swipe-actions {
 <div id="loginScreen">
     <div id="loginBox">
         <h2>Enter Access Token</h2>
-
-        <input
-            id="passwordInput"
-            type="password"
-            placeholder="GitHub Token (ghp_...)"
-        >
-
+        <input id="passwordInput" type="password" placeholder="GitHub Token (ghp_...)">
         <br><br>
-
-        <button id="loginButton">
-            Enter
-        </button>
-
-        <div id="loginError"></div>
+        <button id="loginButton">Enter</button>
+        <div id="loginError" style="color:red;margin-top:10px;"></div>
     </div>
 </div>
 
 <div id="app">
+    <h1>Media Viewer V4.3</h1>
 
-    <h1>Media Viewer</h1>
-
-    <input
-        id="searchInput"
-        type="text"
-        placeholder="Search by URL or number..."
-    >
+    <input id="searchInput" type="text" placeholder="Search by URL or number...">
 
     <div id="statsDashboard" class="stats-dashboard">
-
         <div class="stat-item">
             <span class="stat-label">Progress</span>
             <span id="statProgress" class="stat-value">0%</span>
         </div>
-
         <div class="stat-item">
             <span class="stat-label">Seen</span>
             <span id="statSeen" class="stat-value">0 / 0</span>
         </div>
-
         <div class="stat-item">
             <span class="stat-label">Hearts</span>
             <span id="statHearts" class="stat-value">0</span>
         </div>
-
         <div class="stat-item">
             <span class="stat-label">Remaining</span>
             <span id="statRemaining" class="stat-value">0</span>
         </div>
-
     </div>
 
     <div id="topControls" class="controls"></div>
@@ -777,18 +425,13 @@ body.swipe-mode .swipe-actions {
 
     <div id="bottomControls" class="controls"></div>
 
+    <!-- Floating Right-Hand Thumb Button -->
+    <div class="floating-fab" onclick="nextRandomPage()" title="Next / Random">🎲</div>
+
     <div class="footer-container">
-
-        <button class="clear-btn" onclick="clearAllData()">
-            🗑 Clear All History & Hearts
-        </button>
-
-        <button class="logout-btn" onclick="logoutGitHub()">
-            🔒 Logout / Reset GitHub Token
-        </button>
-
+        <button class="clear-btn" onclick="clearAllData()">🗑 Clear All History & Hearts</button>
+        <button class="logout-btn" onclick="logoutGitHub()">🔒 Logout / Reset GitHub Token</button>
     </div>
-
 </div>
 
 <script src="app.js"></script>
