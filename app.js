@@ -1,5 +1,5 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.5 (Vertical Scroll + Preload)
+   APP.JS - Media Viewer V4.6 (Swipe + Preload + Left/Right Layout)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -33,7 +33,7 @@ let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 // Auto Play State
 let autoPlayActive = false;
 let autoPlayTimer = null;
-let autoPlayInterval = 5000;
+let autoPlayInterval = 3000;
 
 /* ==========================================================
    AUTHENTICATION & INITIALIZATION
@@ -199,7 +199,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA DETECTION & PRELOADING
+   MEDIA DETECTION & AGGRESSIVE PRELOADING (iPhone 11 Optimized)
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
@@ -217,9 +217,9 @@ function normalizeImageURL(url){
     return src;
 }
 
-// Preload the next 3 items in the background for zero-stutter swiping/autoplay
+// Aggressively preload next 5 items into memory to prevent iPhone 11 stutter/delay
 function preloadNextItems(){
-    const preloadCount = 3;
+    const preloadCount = 5;
     for(let i = currentIndex; i < Math.min(currentIndex + preloadCount, workingList.length); i++){
         const item = workingList[i];
         if(item && isImage(item.url)){
@@ -236,12 +236,14 @@ function createMediaElement(item){
         video.src = item.url;
         video.controls = true;
         video.playsInline = true;
-        video.preload = "metadata";
+        video.autoplay = true;
+        video.muted = true;
+        video.preload = "auto";
         element = video;
     } else if(isImage(item.url)){
         const img = document.createElement("img");
         img.src = normalizeImageURL(item.url);
-        img.loading = "lazy";
+        img.loading = "eager";
         img.decoding = "async";
         img.onerror = () => { img.style.display = "none"; };
         element = img;
@@ -484,61 +486,40 @@ function buildDisplayList(){
 }
 
 /* ==========================================================
-   TRACK SEEN MEDIA WITH INTERSECTION
-========================================================== */
-function setupObserver(){
-    if(observer) observer.disconnect();
-    if(observerTimeout) clearTimeout(observerTimeout);
-
-    observerTimeout = setTimeout(() => {
-        observer = new IntersectionObserver((entries, obs) => {
-            entries.forEach(entry => {
-                if(entry.isIntersecting){
-                    const index = Number(entry.target.dataset.index);
-                    if(index && !heartMode && !seenItems.has(index)){
-                        seenItems.add(index);
-                        updateStatsDashboard();
-
-                        const numberEl = document.getElementById(`num-${index}`);
-                        if(numberEl && !numberEl.querySelector(".seen-badge")) {
-                            const badge = document.createElement("span");
-                            badge.className = "seen-badge";
-                            badge.style.marginLeft = "6px";
-                            badge.textContent = "👀 Seen";
-                            numberEl.appendChild(badge);
-                        }
-
-                        obs.unobserve(entry.target);
-                    }
-                }
-            });
-        }, { threshold: 0.5 });
-
-        document.querySelectorAll(".media-container").forEach(wrapper => {
-            observer.observe(wrapper);
-        });
-    }, 1500);
-}
-
-/* ==========================================================
-   RENDER SYSTEM
+   RENDER SYSTEM (Left Stack + Big Random Right)
 ========================================================== */
 function renderControls(){
     const html = `
-        <div style="display:flex; justify-content:center; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
-            <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
-            <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
-            <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-        </div>
-        <div style="display:flex; justify-content:center; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:5px;">
-            <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
-            <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
-            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:7px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:12px;">
-                <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
-                <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
-                <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
-                <option value="12000" ${autoPlayInterval === 12000 ? 'selected' : ''}>12s</option>
-            </select>
+        <div class="dashboard-controls-layout">
+            <!-- Left Stacked Controls -->
+            <div class="left-stack">
+                <div class="left-stack-row">
+                    <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+                    <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+                </div>
+                <div class="left-stack-row">
+                    <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save</button>
+                    <button class="swipe-mode-btn" onclick="toggleSwipeMode()">${swipeMode ? "📜 Scroll" : "👉 Swipe"}</button>
+                </div>
+                <div class="left-stack-row">
+                    <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop' : '▶️ Auto'}</button>
+                    <select onchange="changeAutoPlaySpeed(this.value)">
+                        <option value="1000" ${autoPlayInterval === 1000 ? 'selected' : ''}>1s</option>
+                        <option value="2000" ${autoPlayInterval === 2000 ? 'selected' : ''}>2s</option>
+                        <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
+                        <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
+                        <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Right Large Random Button -->
+            <div class="right-random-wrapper">
+                <button class="random-btn-large" onclick="nextRandomPage()">
+                    <span>🎲</span>
+                    <span>Random</span>
+                </button>
+            </div>
         </div>
     `;
     const topC = document.getElementById("topControls");
@@ -558,7 +539,7 @@ function render(){
     const statusEl = document.getElementById("status");
     if(statusEl) statusEl.textContent = "";
 
-    const pageSize = 15;
+    const pageSize = swipeMode ? 1 : 15;
     let shown = 0;
     let lastTapTime = 0;
 
@@ -615,13 +596,70 @@ function render(){
         }
 
         container.appendChild(wrapper);
+
+        // Mark as seen immediately if in swipe mode
+        if(swipeMode && !heartMode && !seenItems.has(item.index)){
+            seenItems.add(item.index);
+            updateStatsDashboard();
+        }
+
         shown++;
     }
 
-    // Trigger background preloading for subsequent items
+    // Swipe Mode Action Bar
+    if(swipeMode){
+        const swipeActions = document.createElement("div");
+        swipeActions.className = "swipe-actions";
+        swipeActions.innerHTML = `
+            <button class="swipe-action-btn" style="background:#c0392b;" onclick="prevSwipeItem()">⬅️ Prev</button>
+            <button class="swipe-action-btn" style="background:#27ae60;" onclick="nextSwipeItem()">Next ➡️</button>
+        `;
+        container.appendChild(swipeActions);
+
+        // Touch swipe gestures
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        container.addEventListener("touchstart", e => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, {passive: true});
+
+        container.addEventListener("touchend", e => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipeGesture();
+        }, {passive: true});
+
+        function handleSwipeGesture() {
+            if (touchEndX < touchStartX - 50) {
+                nextSwipeItem();
+            }
+            if (touchEndX > touchStartX + 50) {
+                prevSwipeItem();
+            }
+        }
+    }
+
+    // Trigger aggressive background preloading
     preloadNextItems();
 
-    setupObserver();
+    if(!swipeMode){
+        setupObserver();
+    }
+}
+
+function nextSwipeItem(){
+    snapToTop();
+    if(currentIndex >= workingList.length){
+        currentIndex = 0;
+        shuffleArray(workingList);
+    }
+    render();
+}
+
+function prevSwipeItem(){
+    snapToTop();
+    currentIndex = Math.max(0, currentIndex - 2);
+    render();
 }
 
 /* ==========================================================
