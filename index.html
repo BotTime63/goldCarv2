@@ -11,44 +11,33 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
 
-<title>Media Viewer V4.4 - Preload & Centered</title>
+<title>Media Viewer V4.5 - Preload & Normal Scroll</title>
 
 <style>
 * {
     box-sizing: border-box;
 }
 
-html, body {
+html {
+    scroll-behavior: smooth;
+    overscroll-behavior-y: none;
+}
+
+body {
     margin: 0;
     padding: 0;
-    width: 100vw;
-    min-height: 100vh;
     overflow-x: hidden;
     background: #000;
     color: #e0e0e0;
     font-family: Arial, Helvetica, sans-serif;
     text-align: center;
     user-select: none;
-    -webkit-touch-callout: default;
-}
-
-body {
-    display: flex;
-    flex-direction: column;
-}
-
-#app {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    width: 100%;
+    -webkit-touch-callout: default; /* Allows iOS long-press menu to save media */
 }
 
 h1 {
-    margin: 12px 0 6px;
-    font-size: 22px;
+    margin: 15px 0 10px;
+    font-size: 26px;
     font-weight: bold;
 }
 
@@ -60,24 +49,14 @@ img, video {
     user-select: auto;
 }
 
-/* Media Container - Perfectly Centered */
-#mediaContainer {
-    flex: 1;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 50vh;
-}
-
+/* Media */
 .media-container {
     width: 100vw;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    margin: auto 0;
-    padding: 5px 0;
+    margin: 0;
+    padding: 0 0 15px;
     position: relative;
     touch-action: pan-y;
 }
@@ -86,25 +65,25 @@ img, video {
 .media-container video {
     width: auto;
     max-width: 100vw;
-    max-height: 65vh; /* Fits cleanly on iPhone screens without scrolling */
+    max-height: 75vh;
     height: auto;
     object-fit: contain;
     background: #000;
     display: block;
-    touch-action: pan-x pan-y pinch-zoom;
+    touch-action: pan-x pan-y pinch-zoom; /* Enables smooth pinch-to-zoom */
     cursor: pointer;
-    -webkit-touch-callout: default !important;
+    -webkit-touch-callout: default !important; /* Ensures iOS long press works on media */
 }
 
 .media-number {
-    margin: 4px 0 2px;
-    font-size: 11px;
+    margin: 6px 0 4px;
+    font-size: 12px;
     opacity: .55;
 }
 
 .media-container a {
     width: 95%;
-    margin: 2px 0 6px;
+    margin: 6px 0 10px;
     font-size: 11px;
     word-break: break-all;
     text-decoration: none;
@@ -115,10 +94,10 @@ img, video {
     border: none;
     background: transparent;
     color: #fff;
-    font-size: 26px;
+    font-size: 28px;
     cursor: pointer;
     padding: 0;
-    margin: 2px 0;
+    margin: 5px 0;
     transition: transform .15s ease;
 }
 
@@ -154,10 +133,10 @@ img, video {
 /* Search */
 #searchInput {
     width: 90%;
-    max-width: 400px;
-    margin: 4px auto 8px;
-    padding: 8px;
-    font-size: 14px;
+    max-width: 450px;
+    margin: 5px auto 10px;
+    padding: 10px;
+    font-size: 16px;
     border: none;
     border-radius: 8px;
     outline: none;
@@ -169,11 +148,11 @@ img, video {
     justify-content: space-around;
     background: #121212;
     border: 1px solid #222;
-    border-radius: 8px;
+    border-radius: 10px;
     width: 90%;
-    max-width: 400px;
-    margin: 0 auto 8px;
-    padding: 6px 4px;
+    max-width: 450px;
+    margin: 0 auto 15px;
+    padding: 10px 5px;
 }
 
 .stat-item {
@@ -184,26 +163,26 @@ img, video {
 }
 
 .stat-label {
-    font-size: 9px;
+    font-size: 10px;
     color: #888;
     text-transform: uppercase;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
     letter-spacing: 0.5px;
 }
 
 .stat-value {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: bold;
     color: #fff;
 }
 
 /* Buttons */
 button {
-    padding: 8px 12px;
-    margin: 2px;
-    font-size: 11px;
+    padding: 9px 14px;
+    margin: 3px;
+    font-size: 12px;
     border: none;
-    border-radius: 6px;
+    border-radius: 7px;
     cursor: pointer;
     color: #fff;
     background: #4CAF50;
@@ -226,11 +205,11 @@ button:hover {
     display: flex;
     justify-content: center;
     gap: 10px;
-    margin: 8px 0 10px;
+    margin: 10px 0 20px;
 }
 .swipe-action-btn {
-    padding: 10px 16px;
-    font-size: 13px;
+    padding: 12px 20px;
+    font-size: 14px;
     font-weight: bold;
     border-radius: 8px;
 }
@@ -261,33 +240,43 @@ button:hover {
 
 /* Safe Footer Clear Button */
 .footer-container {
-    margin: 20px 0 40px;
-    padding-top: 15px;
+    margin: 40px 0 60px;
+    padding-top: 20px;
     border-top: 1px solid #222;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    width: 100%;
+    gap: 10px;
 }
 
 .clear-btn {
     background: transparent;
     color: #ff6b6b;
     border: 1px dashed #ff6b6b;
-    font-size: 11px;
-    padding: 6px 12px;
+    font-size: 12px;
+    padding: 8px 14px;
     border-radius: 6px;
     opacity: 0.8;
+    transition: all 0.2s ease;
+}
+
+.clear-btn:hover {
+    opacity: 1;
+    background: rgba(255, 107, 107, 0.1);
 }
 
 .logout-btn {
     background: transparent;
     color: #888;
     border: 1px dashed #555;
-    font-size: 10px;
-    padding: 5px 10px;
+    font-size: 11px;
+    padding: 6px 12px;
     border-radius: 6px;
+}
+.logout-btn:hover {
+    color: #fff;
+    border-color: #888;
+    background: rgba(255, 255, 255, 0.05);
 }
 
 /* Controls */
@@ -296,11 +285,15 @@ button:hover {
     text-align: center;
 }
 
+#topControls { margin-top: 5px; }
+#bottomControls { padding-bottom: 10px; }
+
+/* Status */
 #status {
     color: #ff6666;
-    font-size: 13px;
-    margin: 4px;
-    min-height: 18px;
+    font-size: 14px;
+    margin: 10px;
+    min-height: 20px;
 }
 
 /* Welcome */
@@ -310,10 +303,10 @@ button:hover {
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
-    max-width: 400px;
+    max-width: 450px;
     background: #222;
     color: #fff;
-    padding: 12px;
+    padding: 15px;
     border-radius: 10px;
     box-shadow: 0 4px 18px rgba(255, 255, 255, .15);
     display: none;
@@ -363,7 +356,7 @@ button:hover {
 
 <!-- History Modal -->
 <div id="historyModal" class="hidden">
-    <div style="max-width:400px; margin:0 auto;">
+    <div style="max-width:450px; margin:0 auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
             <h3 style="margin:0;">🕒 Recently Viewed History</h3>
             <button onclick="toggleHistoryModal()" style="background:#c0392b; padding:6px 12px;">Close ✕</button>
@@ -383,7 +376,7 @@ button:hover {
 </div>
 
 <div id="app">
-    <h1>Media Viewer</h1>
+    <h1>Media Viewer V4.5</h1>
 
     <input id="searchInput" type="text" placeholder="Search by URL or number...">
 
