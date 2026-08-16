@@ -1,5 +1,5 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.3 Logic (Fixed GitHub Sync & Clear)
+   APP.JS - Media Viewer V4.3 Logic (Fixed GitHub Sync and Clear)
 ========================================================== */
 
 const GITHUB_CONFIG = {
