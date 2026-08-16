@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
 
-<title>Media Viewer V4.6 - Fast Swipe & Layout</title>
+<title>Media Viewer V4.6 - Right-Handed Swipe & Pro</title>
 
 <style>
 * {
@@ -36,8 +36,8 @@ body {
 }
 
 h1 {
-    margin: 15px 0 10px;
-    font-size: 26px;
+    margin: 12px 0 8px;
+    font-size: 24px;
     font-weight: bold;
 }
 
@@ -61,6 +61,13 @@ img, video {
     touch-action: pan-y;
 }
 
+/* Swipe Mode Fullscreen Override */
+body.swipe-mode-active .media-container {
+    height: calc(100vh - 200px);
+    justify-content: center;
+    margin: 0;
+}
+
 .media-container img,
 .media-container video {
     width: auto;
@@ -70,20 +77,25 @@ img, video {
     object-fit: contain;
     background: #000;
     display: block;
-    touch-action: pan-x pan-y pinch-zoom; /* Enables smooth pinch-to-zoom */
+    touch-action: pan-x pan-y pinch-zoom;
     cursor: pointer;
-    -webkit-touch-callout: default !important; /* Ensures iOS long press works on media */
+    -webkit-touch-callout: default !important;
+}
+
+body.swipe-mode-active .media-container img,
+body.swipe-mode-active .media-container video {
+    max-height: 65vh;
 }
 
 .media-number {
-    margin: 6px 0 4px;
+    margin: 4px 0 2px;
     font-size: 12px;
     opacity: .55;
 }
 
 .media-container a {
     width: 95%;
-    margin: 6px 0 10px;
+    margin: 4px 0 6px;
     font-size: 11px;
     word-break: break-all;
     text-decoration: none;
@@ -94,10 +106,10 @@ img, video {
     border: none;
     background: transparent;
     color: #fff;
-    font-size: 28px;
+    font-size: 32px;
     cursor: pointer;
-    padding: 0;
-    margin: 5px 0;
+    padding: 4px 10px;
+    margin: 2px 0;
     transition: transform .15s ease;
 }
 
@@ -134,9 +146,9 @@ img, video {
 #searchInput {
     width: 90%;
     max-width: 450px;
-    margin: 5px auto 10px;
-    padding: 10px;
-    font-size: 16px;
+    margin: 4px auto 8px;
+    padding: 8px 10px;
+    font-size: 15px;
     border: none;
     border-radius: 8px;
     outline: none;
@@ -151,8 +163,8 @@ img, video {
     border-radius: 10px;
     width: 90%;
     max-width: 450px;
-    margin: 0 auto 15px;
-    padding: 10px 5px;
+    margin: 0 auto 10px;
+    padding: 8px 5px;
 }
 
 .stat-item {
@@ -166,76 +178,23 @@ img, video {
     font-size: 10px;
     color: #888;
     text-transform: uppercase;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     letter-spacing: 0.5px;
 }
 
 .stat-value {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: bold;
     color: #fff;
 }
 
-/* Custom Control Layout: Left Stack & Big Random Right */
-.dashboard-controls-layout {
-    display: flex;
-    justify-content: center;
-    align-items: stretch;
-    width: 90%;
-    max-width: 450px;
-    margin: 0 auto 10px;
-    gap: 8px;
-}
-
-.left-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    flex: 1;
-}
-
-.left-stack-row {
-    display: flex;
-    gap: 5px;
-}
-
-.left-stack-row button,
-.left-stack-row select {
-    flex: 1;
-    margin: 0;
-}
-
-.right-random-wrapper {
-    flex: 1;
-    display: flex;
-}
-
-.random-btn-large {
-    width: 100%;
-    background: #8e44ad;
-    font-size: 20px;
-    font-weight: bold;
-    border-radius: 10px;
-    margin: 0;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 15px 5px;
-    box-shadow: 0 4px 12px rgba(142, 68, 173, 0.4);
-}
-
-.random-btn-large:hover {
-    background: #7d3c98;
-}
-
-/* Standard Buttons */
+/* Buttons */
 button {
-    padding: 9px 12px;
-    font-size: 11px;
+    padding: 10px 14px;
+    margin: 3px;
+    font-size: 13px;
     border: none;
-    border-radius: 7px;
+    border-radius: 8px;
     cursor: pointer;
     color: #fff;
     background: #4CAF50;
@@ -246,35 +205,12 @@ button:hover {
     background: #45A049;
 }
 
+.random-btn { background: #8e44ad; font-weight: bold; }
 .heart-mode-btn { background: #e91e63; }
-.swipe-mode-btn { background: #2980b9; }
+.swipe-mode-btn { background: #2980b9; font-weight: bold; }
 .history-btn { background: #34495e; }
 .sync-btn { background: #27ae60; font-weight: bold; }
 .autoplay-btn { background: #16a085; font-weight: bold; }
-
-select {
-    padding: 7px;
-    border-radius: 6px;
-    background: #222;
-    color: #fff;
-    border: 1px solid #444;
-    font-size: 11px;
-    outline: none;
-}
-
-/* Swipe Mode Action Bar */
-.swipe-actions {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 10px 0 20px;
-}
-.swipe-action-btn {
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: bold;
-    border-radius: 8px;
-}
 
 /* History Modal */
 #historyModal {
@@ -302,29 +238,23 @@ select {
 
 /* Safe Footer Clear Button */
 .footer-container {
-    margin: 40px 0 60px;
-    padding-top: 20px;
+    margin: 25px 0 50px;
+    padding-top: 15px;
     border-top: 1px solid #222;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .clear-btn {
     background: transparent;
     color: #ff6b6b;
     border: 1px dashed #ff6b6b;
-    font-size: 12px;
-    padding: 8px 14px;
+    font-size: 11px;
+    padding: 7px 12px;
     border-radius: 6px;
     opacity: 0.8;
-    transition: all 0.2s ease;
-}
-
-.clear-btn:hover {
-    opacity: 1;
-    background: rgba(255, 107, 107, 0.1);
 }
 
 .logout-btn {
@@ -332,13 +262,8 @@ select {
     color: #888;
     border: 1px dashed #555;
     font-size: 11px;
-    padding: 6px 12px;
+    padding: 5px 10px;
     border-radius: 6px;
-}
-.logout-btn:hover {
-    color: #fff;
-    border-color: #888;
-    background: rgba(255, 255, 255, 0.05);
 }
 
 /* Controls */
@@ -347,15 +272,15 @@ select {
     text-align: center;
 }
 
-#topControls { margin-top: 5px; }
-#bottomControls { padding-bottom: 10px; }
+#topControls { margin-top: 3px; }
+#bottomControls { padding-bottom: 5px; }
 
 /* Status */
 #status {
     color: #ff6666;
-    font-size: 14px;
-    margin: 10px;
-    min-height: 20px;
+    font-size: 13px;
+    margin: 6px;
+    min-height: 18px;
 }
 
 /* Welcome */
