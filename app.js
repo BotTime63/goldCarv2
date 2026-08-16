@@ -1,6 +1,7 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.4
+   APP.JS - Media Viewer V4.5
    Mobile UI + Swipe Preloading + Thumbnail History
+   GitHub Sync + Auto Play + Search + Hearts + Seen
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -16,9 +17,11 @@ const HISTORY_LIMIT = 20;
 let mediaUrls = [];
 let workingList = [];
 let currentIndex = 0;
+
 let searchTimer = null;
 let observer = null;
 let observerTimeout = null;
+
 let recentHistory = [];
 
 const STORAGE = {
@@ -38,7 +41,7 @@ let swipeMode =
 
 
 /* ==========================================================
-   AUTO PLAY STATE
+   AUTO PLAY
 ========================================================== */
 
 let autoPlayActive = false;
@@ -47,34 +50,31 @@ let autoPlayInterval = 5000;
 
 
 /* ==========================================================
-   MEDIA PRELOAD CACHE
+   PRELOAD CACHE
 ========================================================== */
-
-/*
-   Keeps a small cache of media elements that have already
-   been requested by the browser.
-
-   We intentionally preload only a small number of items
-   rather than trying to download thousands of files.
-*/
 
 const preloadCache = new Map();
 
-const MAX_PRELOAD_CACHE = 6;
+const MAX_PRELOAD_CACHE = 8;
 
 
 /* ==========================================================
-   AUTHENTICATION & INITIALIZATION
+   AUTHENTICATION
 ========================================================== */
 
 function checkPassword() {
 
     const tokenInput =
-        document.getElementById("passwordInput").value.trim();
+        document.getElementById("passwordInput")
+            ?.value
+            .trim();
 
     if (
-        tokenInput.startsWith("ghp_") ||
-        tokenInput.startsWith("github_pat_")
+        tokenInput &&
+        (
+            tokenInput.startsWith("ghp_") ||
+            tokenInput.startsWith("github_pat_")
+        )
     ) {
 
         GITHUB_CONFIG.token = tokenInput;
@@ -84,15 +84,24 @@ function checkPassword() {
             tokenInput
         );
 
-        document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "block";
+        document.getElementById("loginScreen").style.display =
+            "none";
+
+        document.getElementById("app").style.display =
+            "block";
 
         initializeApp();
 
     } else {
 
-        document.getElementById("loginError").textContent =
-            "Invalid token format (must start with ghp_ or github_pat_)";
+        const error =
+            document.getElementById("loginError");
+
+        if (error) {
+
+            error.textContent =
+                "Invalid token format (must start with ghp_ or github_pat_)";
+        }
     }
 }
 
@@ -105,62 +114,67 @@ function logoutGitHub() {
         )
     ) {
 
-        localStorage.removeItem("mediaViewerToken");
+        localStorage.removeItem(
+            "mediaViewerToken"
+        );
 
         location.reload();
     }
 }
 
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
 
-    const loginBtn =
-        document.getElementById("loginButton");
+        const loginBtn =
+            document.getElementById("loginButton");
 
-    const pwdInput =
-        document.getElementById("passwordInput");
-
-
-    if (loginBtn) {
-
-        loginBtn.addEventListener(
-            "click",
-            checkPassword
-        );
-    }
+        const pwdInput =
+            document.getElementById("passwordInput");
 
 
-    if (pwdInput) {
+        if (loginBtn) {
 
-        pwdInput.addEventListener(
-            "keypress",
-            (e) => {
+            loginBtn.addEventListener(
+                "click",
+                checkPassword
+            );
+        }
 
-                if (e.key === "Enter") {
-                    checkPassword();
+
+        if (pwdInput) {
+
+            pwdInput.addEventListener(
+                "keypress",
+                (e) => {
+
+                    if (e.key === "Enter") {
+                        checkPassword();
+                    }
+
                 }
+            );
+        }
 
-            }
-        );
+
+        if (GITHUB_CONFIG.token) {
+
+            document.getElementById("loginScreen").style.display =
+                "none";
+
+            document.getElementById("app").style.display =
+                "block";
+
+            initializeApp();
+        }
+
     }
-
-
-    if (GITHUB_CONFIG.token) {
-
-        document.getElementById("loginScreen").style.display =
-            "none";
-
-        document.getElementById("app").style.display =
-            "block";
-
-        initializeApp();
-    }
-
-});
+);
 
 
 /* ==========================================================
-   GITHUB API SAVE & LOAD
+   GITHUB API
 ========================================================== */
 
 async function fetchGitHubFile(path) {
@@ -170,15 +184,19 @@ async function fetchGitHubFile(path) {
         const url =
             `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
 
-        const res = await fetch(
-            url,
-            {
-                headers: {
-                    Authorization:
-                        `token ${GITHUB_CONFIG.token}`
+        const res =
+            await fetch(
+                url,
+                {
+                    headers: {
+                        Authorization:
+                            `token ${GITHUB_CONFIG.token}`,
+                        Accept:
+                            "application/vnd.github+json"
+                    },
+                    cache: "no-store"
                 }
-            }
-        );
+            );
 
 
         if (!res.ok) {
@@ -186,23 +204,39 @@ async function fetchGitHubFile(path) {
         }
 
 
-        const data = await res.json();
+        const data =
+            await res.json();
 
-        const content =
-            JSON.parse(
-                atob(data.content)
+
+        const binary =
+            atob(
+                data.content.replace(/\n/g, "")
             );
 
 
+        const bytes =
+            Uint8Array.from(
+                binary,
+                char => char.charCodeAt(0)
+            );
+
+
+        const decoded =
+            new TextDecoder().decode(bytes);
+
+
         return {
-            content,
-            sha: data.sha
+            content:
+                JSON.parse(decoded),
+
+            sha:
+                data.sha
         };
 
 
     } catch (e) {
 
-        console.log(
+        console.error(
             `Could not load ${path} from GitHub:`,
             e
         );
@@ -217,11 +251,9 @@ async function saveGitHubFile(path, dataArray) {
     const url =
         `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
 
+
     const existing =
         await fetchGitHubFile(path);
-
-    const sha =
-        existing ? existing.sha : undefined;
 
 
     const jsonString =
@@ -232,18 +264,44 @@ async function saveGitHubFile(path, dataArray) {
         );
 
 
-    const contentBase64 =
-        btoa(
-            unescape(
-                encodeURIComponent(jsonString)
+    const encoder =
+        new TextEncoder();
+
+
+    const bytes =
+        encoder.encode(
+            jsonString
+        );
+
+
+    let binary = "";
+
+    const chunkSize = 0x8000;
+
+
+    for (
+        let i = 0;
+        i < bytes.length;
+        i += chunkSize
+    ) {
+
+        binary += String.fromCharCode(
+            ...bytes.subarray(
+                i,
+                i + chunkSize
             )
         );
+    }
+
+
+    const contentBase64 =
+        btoa(binary);
 
 
     const body = {
 
         message:
-            `Update ${path} from Mobile Viewer`,
+            `Update ${path} from Media Viewer`,
 
         content:
             contentBase64,
@@ -253,8 +311,8 @@ async function saveGitHubFile(path, dataArray) {
     };
 
 
-    if (sha) {
-        body.sha = sha;
+    if (existing?.sha) {
+        body.sha = existing.sha;
     }
 
 
@@ -265,8 +323,11 @@ async function saveGitHubFile(path, dataArray) {
                 method: "PUT",
 
                 headers: {
-                    "Authorization":
+                    Authorization:
                         `token ${GITHUB_CONFIG.token}`,
+
+                    Accept:
+                        "application/vnd.github+json",
 
                     "Content-Type":
                         "application/json"
@@ -285,11 +346,15 @@ async function saveGitHubFile(path, dataArray) {
                 () => ({})
             );
 
+
         throw new Error(
             errData.message ||
             `Failed to commit ${path}`
         );
     }
+
+
+    return true;
 }
 
 
@@ -303,11 +368,16 @@ async function loadServerData() {
 
     if (
         heartsRes &&
-        Array.isArray(heartsRes.content)
+        Array.isArray(
+            heartsRes.content
+        )
     ) {
 
         heartedItems =
-            new Set(heartsRes.content);
+            new Set(
+                heartsRes.content
+                    .map(Number)
+            );
     }
 
 
@@ -319,11 +389,16 @@ async function loadServerData() {
 
     if (
         seenRes &&
-        Array.isArray(seenRes.content)
+        Array.isArray(
+            seenRes.content
+        )
     ) {
 
         seenItems =
-            new Set(seenRes.content);
+            new Set(
+                seenRes.content
+                    .map(Number)
+            );
     }
 
 
@@ -369,6 +444,7 @@ async function manualSyncToGitHub() {
             statusEl.textContent =
                 "✅ Successfully saved to GitHub!";
 
+
             setTimeout(
                 () => {
                     statusEl.textContent = "";
@@ -393,6 +469,10 @@ async function manualSyncToGitHub() {
 }
 
 
+/* ==========================================================
+   SETTINGS
+========================================================== */
+
 function saveSettings() {
 
     localStorage.setItem(
@@ -409,7 +489,7 @@ function saveSettings() {
 
 
 /* ==========================================================
-   STATS DASHBOARD
+   STATS
 ========================================================== */
 
 function updateStatsDashboard() {
@@ -485,7 +565,7 @@ function updateStatsDashboard() {
 
 
 /* ==========================================================
-   WELCOME BANNER
+   WELCOME
 ========================================================== */
 
 function showWelcome() {
@@ -535,9 +615,10 @@ function showWelcome() {
 function isImage(url) {
 
     return (
-        /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) ||
+        /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)(\?.*)?$/i.test(url) ||
         url.includes("pbs.twimg.com") ||
-        url.includes("abs.twimg.com")
+        url.includes("abs.twimg.com") ||
+        url.includes("i.redd.it")
     );
 }
 
@@ -545,7 +626,7 @@ function isImage(url) {
 function isVideo(url) {
 
     return (
-        /\.(mp4|webm|mov|m4v)$/i.test(url) ||
+        /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(url) ||
         url.includes("video.twimg.com")
     );
 }
@@ -553,7 +634,8 @@ function isVideo(url) {
 
 function normalizeImageURL(url) {
 
-    let src = url;
+    let src =
+        url;
 
 
     if (
@@ -574,7 +656,7 @@ function normalizeImageURL(url) {
 
 
 /* ==========================================================
-   MEDIA ELEMENT CREATION
+   MEDIA ELEMENT
 ========================================================== */
 
 function createMediaElement(item) {
@@ -602,6 +684,9 @@ function createMediaElement(item) {
                 ? "auto"
                 : "metadata";
 
+        video.muted =
+            false;
+
 
         element =
             video;
@@ -619,11 +704,6 @@ function createMediaElement(item) {
             );
 
 
-        /*
-           Normal mode can still use lazy loading.
-           Swipe Mode needs the media immediately.
-        */
-
         img.loading =
             swipeMode
                 ? "eager"
@@ -636,6 +716,7 @@ function createMediaElement(item) {
 
         img.onerror =
             () => {
+
                 img.style.display =
                     "none";
             };
@@ -651,12 +732,12 @@ function createMediaElement(item) {
 
 
 /* ==========================================================
-   MEDIA PRELOADING
+   PRELOAD
 ========================================================== */
 
 function preloadMedia(item) {
 
-    if (!item || !item.url) {
+    if (!item?.url) {
         return;
     }
 
@@ -677,6 +758,7 @@ function preloadMedia(item) {
         const img =
             new Image();
 
+
         img.decoding =
             "async";
 
@@ -693,9 +775,8 @@ function preloadMedia(item) {
     } else if (isVideo(url)) {
 
         const video =
-            document.createElement(
-                "video"
-            );
+            document.createElement("video");
+
 
         video.preload =
             "auto";
@@ -710,11 +791,6 @@ function preloadMedia(item) {
             url;
 
 
-        /*
-           load() asks the browser to begin
-           fetching the video.
-        */
-
         video.load();
 
 
@@ -725,19 +801,15 @@ function preloadMedia(item) {
     }
 
 
-    /*
-       Keep the cache small.
-       We do not want an iPhone trying to
-       remember thousands of media objects.
-    */
-
-    if (
+    while (
         preloadCache.size >
         MAX_PRELOAD_CACHE
     ) {
 
         const oldestKey =
-            preloadCache.keys().next().value;
+            preloadCache.keys()
+                .next()
+                .value;
 
 
         preloadCache.delete(
@@ -747,23 +819,35 @@ function preloadMedia(item) {
 }
 
 
-/*
-   Preload the next item in Swipe Mode.
-*/
-
-function preloadNextSwipeMedia() {
+function preloadSwipeItems() {
 
     if (!swipeMode) {
         return;
     }
 
 
-    const nextItem =
-        workingList[currentIndex];
+    /*
+       Preload several items ahead.
+
+       This is deliberately small so an iPhone
+       does not start downloading hundreds of files.
+    */
+
+    for (
+        let offset = 0;
+        offset < 3;
+        offset++
+    ) {
+
+        const item =
+            workingList[
+                currentIndex + offset
+            ];
 
 
-    if (nextItem) {
-        preloadMedia(nextItem);
+        if (item) {
+            preloadMedia(item);
+        }
     }
 }
 
@@ -812,7 +896,7 @@ function shuffleArray(array) {
 
 
 /* ==========================================================
-   SEARCH SYSTEM
+   SEARCH
 ========================================================== */
 
 function applySearch() {
@@ -867,9 +951,7 @@ function toggleHeart(index) {
 
 
     document
-        .querySelectorAll(
-            ".heart-btn"
-        )
+        .querySelectorAll(".heart-btn")
         .forEach(
             btn => {
 
@@ -891,32 +973,24 @@ function toggleHeart(index) {
                             : "♡";
 
 
-                    if (active) {
-
-                        btn.classList.add(
-                            "active"
-                        );
-
-                    } else {
-
-                        btn.classList.remove(
-                            "active"
-                        );
-                    }
+                    btn.classList.toggle(
+                        "active",
+                        active
+                    );
                 }
             }
         );
 
 
     document
-        .querySelectorAll(
-            ".swipe-action-btn"
-        )
+        .querySelectorAll(".swipe-action-btn")
         .forEach(
             btn => {
 
                 if (
-                    btn.dataset.index == index
+                    Number(
+                        btn.dataset.index
+                    ) === index
                 ) {
 
                     btn.textContent =
@@ -947,7 +1021,11 @@ function toggleHeart(index) {
 
         setTimeout(
             () => {
-                nextRandomPage();
+
+                if (swipeMode) {
+                    nextRandomPage();
+                }
+
             },
             350
         );
@@ -960,7 +1038,9 @@ function handleDoubleTap(
     wrapperElement
 ) {
 
-    toggleHeart(itemIndex);
+    toggleHeart(
+        itemIndex
+    );
 
 
     const existingHeart =
@@ -975,9 +1055,7 @@ function handleDoubleTap(
 
 
     const heartPop =
-        document.createElement(
-            "div"
-        );
+        document.createElement("div");
 
 
     heartPop.className =
@@ -995,7 +1073,11 @@ function handleDoubleTap(
 
     setTimeout(
         () => {
-            heartPop.remove();
+
+            if (heartPop.parentNode) {
+                heartPop.remove();
+            }
+
         },
         600
     );
@@ -1050,23 +1132,22 @@ function toggleSwipeMode() {
         0;
 
 
-    /*
-       Tell CSS that we are entering/leaving
-       full-screen-style Swipe Mode.
-    */
-
     document.body.classList.toggle(
         "swipe-mode",
         swipeMode
     );
 
 
-    /*
-       Clear old preloads when switching modes.
-       New ones will be generated for Swipe Mode.
-    */
-
     preloadCache.clear();
+
+
+    workingList =
+        buildDisplayList();
+
+
+    shuffleArray(
+        workingList
+    );
 
 
     render();
@@ -1110,7 +1191,9 @@ function startAutoPlayTimer() {
     autoPlayTimer =
         setInterval(
             () => {
+
                 nextRandomPage();
+
             },
             autoPlayInterval
         );
@@ -1201,11 +1284,6 @@ function toggleHistoryModal() {
 }
 
 
-/*
-   Protect URLs before inserting them into
-   HTML generated by this function.
-*/
-
 function escapeHTML(value) {
 
     return String(value)
@@ -1232,19 +1310,6 @@ function escapeHTML(value) {
 }
 
 
-/*
-   Build a thumbnail for History.
-
-   Images:
-       regular <img>
-
-   Videos:
-       small muted <video>
-
-   Unknown media:
-       placeholder
-*/
-
 function createHistoryThumbnail(item) {
 
     const safeUrl =
@@ -1263,8 +1328,9 @@ function createHistoryThumbnail(item) {
                 src="${safeUrl}"
                 loading="lazy"
                 decoding="async"
-                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
             >
+
             <div
                 class="history-thumbnail-placeholder"
                 style="display:none;"
@@ -1285,6 +1351,7 @@ function createHistoryThumbnail(item) {
                 muted
                 playsinline
                 preload="metadata"
+                class="history-thumbnail"
             ></video>
         `;
     }
@@ -1427,7 +1494,6 @@ async function clearAllData() {
             "Clear all hearts and seen media history locally and on GitHub?"
         )
     ) {
-
         return;
     }
 
@@ -1437,21 +1503,7 @@ async function clearAllData() {
     recentHistory = [];
 
 
-    document
-        .querySelectorAll(
-            ".heart-btn"
-        )
-        .forEach(
-            btn => {
-
-                btn.textContent =
-                    "♡";
-
-                btn.classList.remove(
-                    "active"
-                );
-            }
-        );
+    updateStatsDashboard();
 
 
     applySearch();
@@ -1595,7 +1647,7 @@ function buildDisplayList() {
 
 
 /* ==========================================================
-   TRACK SEEN MEDIA
+   SEEN OBSERVER
 ========================================================== */
 
 function setupObserver() {
@@ -1606,7 +1658,9 @@ function setupObserver() {
 
 
     if (observerTimeout) {
-        clearTimeout(observerTimeout);
+        clearTimeout(
+            observerTimeout
+        );
     }
 
 
@@ -1712,30 +1766,24 @@ function setupObserver() {
                     );
 
             },
-            1500
+            500
         );
 }
 
 
 /* ==========================================================
-   RENDER CONTROLS
+   CONTROLS
 ========================================================== */
 
 function renderControls() {
 
     /*
-       New mobile layout:
+       IMPORTANT:
 
-       LEFT:
-           History
-           Swipe
-           Hearts
-           Save
-           Auto Play
-           Speed
+       We render the same control layout into BOTH
+       topControls and bottomControls.
 
-       RIGHT:
-           BIG RANDOM
+       Therefore Random exists at the top AND bottom.
     */
 
     const html = `
@@ -1755,11 +1803,15 @@ function renderControls() {
                 <button
                     class="swipe-mode-btn"
                     onclick="toggleSwipeMode()"
-                    style="background:${swipeMode ? "#d35400" : "#2980b9"}"
+                    style="background:${swipeMode
+                        ? "#d35400"
+                        : "#2980b9"}"
                 >
-                    ${swipeMode
-                        ? "🎴 Swipe: ON"
-                        : "🎴 Swipe: OFF"}
+                    ${
+                        swipeMode
+                            ? "🎴 Swipe: ON"
+                            : "🎴 Swipe: OFF"
+                    }
                 </button>
 
 
@@ -1767,9 +1819,11 @@ function renderControls() {
                     class="heart-mode-btn"
                     onclick="showHeartedOnly()"
                 >
-                    ${heartMode
-                        ? "❤️ Hearts"
-                        : "♡ Hearts"}
+                    ${
+                        heartMode
+                            ? "❤️ Hearts"
+                            : "♡ Hearts"
+                    }
                 </button>
 
             </div>
@@ -1806,54 +1860,56 @@ function renderControls() {
                     ? "#c0392b"
                     : "#16a085"}"
             >
-                ${autoPlayActive
-                    ? "⏹️ Stop Auto"
-                    : "▶️ Auto Play"}
+                ${
+                    autoPlayActive
+                        ? "⏹️ Stop Auto"
+                        : "▶️ Auto Play"
+                }
             </button>
 
 
             <select
-    onchange="changeAutoPlaySpeed(this.value)"
->
+                onchange="changeAutoPlaySpeed(this.value)"
+            >
 
-    <option
-        value="1000"
-        ${autoPlayInterval === 1000
-            ? "selected"
-            : ""}
-    >
-        1s
-    </option>
-
-
-    <option
-        value="2000"
-        ${autoPlayInterval === 2000
-            ? "selected"
-            : ""}
-    >
-        2s
-    </option>
+                <option
+                    value="1000"
+                    ${autoPlayInterval === 1000
+                        ? "selected"
+                        : ""}
+                >
+                    1s
+                </option>
 
 
-    <option
-        value="3000"
-        ${autoPlayInterval === 3000
-            ? "selected"
-            : ""}
-    >
-        3s
-    </option>
+                <option
+                    value="2000"
+                    ${autoPlayInterval === 2000
+                        ? "selected"
+                        : ""}
+                >
+                    2s
+                </option>
 
 
-    <option
-        value="5000"
-        ${autoPlayInterval === 5000
-            ? "selected"
-            : ""}
-    >
-        5s
-    </option>
+                <option
+                    value="3000"
+                    ${autoPlayInterval === 3000
+                        ? "selected"
+                        : ""}
+                >
+                    3s
+                </option>
+
+
+                <option
+                    value="5000"
+                    ${autoPlayInterval === 5000
+                        ? "selected"
+                        : ""}
+                >
+                    5s
+                </option>
 
 
                 <option
@@ -1893,21 +1949,17 @@ function renderControls() {
         );
 
 
-    /*
-       We intentionally use only the top controls.
-       The old version duplicated the entire control
-       panel at the bottom.
-    */
-
     if (topC) {
+
         topC.innerHTML =
             html;
     }
 
 
     if (botC) {
+
         botC.innerHTML =
-            "";
+            html;
     }
 }
 
@@ -1918,10 +1970,6 @@ function renderControls() {
 
 function render() {
 
-    /*
-       Keep CSS synchronized with JavaScript state.
-    */
-
     document.body.classList.toggle(
         "swipe-mode",
         swipeMode
@@ -1929,6 +1977,7 @@ function render() {
 
 
     renderControls();
+
 
     updateStatsDashboard();
 
@@ -1959,14 +2008,6 @@ function render() {
             "";
     }
 
-
-    /*
-       Swipe Mode:
-           one item
-
-       Normal Mode:
-           fifteen items
-    */
 
     const pageSize =
         swipeMode
@@ -2014,7 +2055,7 @@ function render() {
 
 
         /* ==================================================
-           MEDIA NUMBER
+           NUMBER
         ================================================== */
 
         const number =
@@ -2097,16 +2138,15 @@ function render() {
                 : "♡";
 
 
-        if (isHearted) {
-
-            heart.classList.add(
-                "active"
-            );
-        }
+        heart.classList.toggle(
+            "active",
+            isHearted
+        );
 
 
         heart.onclick =
             () => {
+
                 toggleHeart(
                     item.index
                 );
@@ -2144,6 +2184,10 @@ function render() {
             item.url;
 
 
+        link.className =
+            "media-url";
+
+
         wrapper.appendChild(
             link
         );
@@ -2154,63 +2198,95 @@ function render() {
         ================================================== */
 
         const media =
-    createMediaElement(
-        item
-    );
+            createMediaElement(
+                item
+            );
 
-if (media) {
 
-    if (swipeMode) {
+        if (media) {
 
-        media.style.maxWidth = "100%";
-        media.style.maxHeight = "85vh";
-        media.style.width = "auto";
-        media.style.height = "auto";
-        media.style.objectFit = "contain";
-        media.style.display = "block";
-        media.style.margin = "0 auto";
-    }
+            /*
+               Swipe Mode:
 
-    media.addEventListener(
-        "click",
-        (e) => {
+               Keep the ORIGINAL aspect ratio.
+               Never force width + height simultaneously.
+               This prevents cropping/stretching.
+            */
 
-            const currentTime =
-                new Date().getTime();
+            if (swipeMode) {
 
-            const tapLength =
-                currentTime -
-                lastTapTime;
+                media.style.display =
+                    "block";
 
-            if (
-                tapLength < 300 &&
-                tapLength > 0
-            ) {
+                media.style.maxWidth =
+                    "100%";
 
-                e.preventDefault();
+                media.style.maxHeight =
+                    "72vh";
 
-                handleDoubleTap(
-                    item.index,
-                    wrapper
-                );
+                media.style.width =
+                    "auto";
+
+                media.style.height =
+                    "auto";
+
+                media.style.objectFit =
+                    "contain";
+
+                media.style.margin =
+                    "0 auto";
             }
 
-            lastTapTime =
-                currentTime;
-        }
-    );
 
-    wrapper.appendChild(
-        media
-    );
-}
+            media.addEventListener(
+                "click",
+                (e) => {
+
+                    const currentTime =
+                        Date.now();
+
+
+                    const tapLength =
+                        currentTime -
+                        lastTapTime;
+
+
+                    if (
+                        tapLength < 300 &&
+                        tapLength > 0
+                    ) {
+
+                        e.preventDefault();
+
+
+                        handleDoubleTap(
+                            item.index,
+                            wrapper
+                        );
+                    }
+
+
+                    lastTapTime =
+                        currentTime;
+                }
+            );
+
+
+            wrapper.appendChild(
+                media
+            );
+        }
 
 
         /* ==================================================
-           SWIPE MODE
+           SWIPE ACTIONS
         ================================================== */
 
         if (swipeMode) {
+
+            /*
+               Buttons are OUTSIDE the media element.
+            */
 
             const swipeActions =
                 document.createElement(
@@ -2257,8 +2333,8 @@ if (media) {
 
 
             /*
-               Swipe Mode considers the media seen
-               once it is presented.
+               Swipe Mode marks the item seen
+               immediately when displayed.
             */
 
             if (
@@ -2284,7 +2360,7 @@ if (media) {
             let touchStartX =
                 0;
 
-            let touchEndX =
+            let touchStartY =
                 0;
 
 
@@ -2297,8 +2373,12 @@ if (media) {
                     ) {
 
                         touchStartX =
-                            e.changedTouches[0]
+                            e.touches[0]
                                 .screenX;
+
+                        touchStartY =
+                            e.touches[0]
+                                .screenY;
                     }
 
                 },
@@ -2313,45 +2393,63 @@ if (media) {
                 (e) => {
 
                     if (
-                        e.changedTouches.length === 1
+                        e.changedTouches.length !== 1
+                    ) {
+                        return;
+                    }
+
+
+                    const touchEndX =
+                        e.changedTouches[0]
+                            .screenX;
+
+
+                    const touchEndY =
+                        e.changedTouches[0]
+                            .screenY;
+
+
+                    const diffX =
+                        touchEndX -
+                        touchStartX;
+
+
+                    const diffY =
+                        touchEndY -
+                        touchStartY;
+
+
+                    /*
+                       Only treat it as a horizontal
+                       swipe when horizontal movement
+                       is clearly larger.
+                    */
+
+                    if (
+                        Math.abs(diffX) > 70 &&
+                        Math.abs(diffX) >
+                        Math.abs(diffY) * 1.25
                     ) {
 
-                        touchEndX =
-                            e.changedTouches[0]
-                                .screenX;
-
-
-                        const diff =
-                            touchEndX -
-                            touchStartX;
-
-
                         if (
-                            Math.abs(diff) > 70
+                            diffX < 0
                         ) {
 
-                            if (
-                                diff < 0
-                            ) {
+                            /*
+                               LEFT = NEXT
+                            */
 
-                                /*
-                                   Swipe LEFT =
-                                   next media
-                                */
+                            nextRandomPage();
 
-                                nextRandomPage();
+                        } else {
 
-                            } else {
+                            /*
+                               RIGHT = HEART
+                            */
 
-                                /*
-                                   Swipe RIGHT =
-                                   heart
-                                */
-
-                                toggleHeart(
-                                    item.index
-                                );
-                            }
+                            toggleHeart(
+                                item.index
+                            );
                         }
                     }
 
@@ -2373,12 +2471,12 @@ if (media) {
 
 
     /* ==================================================
-       PRELOAD NEXT SWIPE ITEM
+       PRELOAD
     ================================================== */
 
     if (swipeMode) {
 
-        preloadNextSwipeMedia();
+        preloadSwipeItems();
 
     } else {
 
@@ -2388,16 +2486,14 @@ if (media) {
 
 
 /* ==========================================================
-   RANDOM PAGE SYSTEM
+   RANDOM PAGE
 ========================================================== */
 
 function nextRandomPage() {
 
     /*
-       Normal Mode can safely return to the top.
-
-       Swipe Mode is handled by the viewport layout,
-       so we avoid the jarring scroll-to-top operation.
+       Stop autoplay from accidentally stacking
+       multiple timers by keeping the same timer.
     */
 
     if (!swipeMode) {
@@ -2454,6 +2550,11 @@ function nextRandomPage() {
             workingList.length === 0
         ) {
 
+            /*
+               Entire collection has been seen.
+               Reset the seen cycle.
+            */
+
             seenItems.clear();
 
 
@@ -2481,12 +2582,15 @@ function nextRandomPage() {
     }
 
 
+    preloadCache.clear();
+
+
     render();
 }
 
 
 /* ==========================================================
-   INITIALIZE APPLICATION
+   INITIALIZE
 ========================================================== */
 
 async function initializeApp() {
@@ -2496,7 +2600,10 @@ async function initializeApp() {
         const response =
             await fetch(
                 "mediaNEW.json?t=" +
-                new Date().getTime()
+                Date.now(),
+                {
+                    cache: "no-store"
+                }
             );
 
 
@@ -2515,8 +2622,11 @@ async function initializeApp() {
         mediaUrls =
             data.map(
                 (url, index) => ({
-                    url: url,
-                    index: index + 1
+                    url:
+                        String(url),
+
+                    index:
+                        index + 1
                 })
             );
 
@@ -2551,6 +2661,11 @@ async function initializeApp() {
 
     } catch (error) {
 
+        console.error(
+            error
+        );
+
+
         const statusEl =
             document.getElementById(
                 "status"
@@ -2571,16 +2686,23 @@ async function initializeApp() {
    SEARCH EVENT
 ========================================================== */
 
-const searchInputEl =
-    document.getElementById(
-        "searchInput"
-    );
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        const searchInputEl =
+            document.getElementById(
+                "searchInput"
+            );
 
 
-if (searchInputEl) {
+        if (searchInputEl) {
 
-    searchInputEl.addEventListener(
-        "input",
-        debouncedSearch
-    );
-}
+            searchInputEl.addEventListener(
+                "input",
+                debouncedSearch
+            );
+        }
+
+    }
+);
