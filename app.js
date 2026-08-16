@@ -1,14 +1,40 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.6 (Swipe Mode + Auto-Next Heart)
+   GITHUB CONFIGURATION (For iPhone & PC Sync)
 ========================================================== */
-
 const GITHUB_CONFIG = {
-    owner: "bottime63",
+    owner: "BotTime63",
     repo: "goldCarv2",
-    token: localStorage.getItem("mediaViewerToken") || "",
-    branch: "main"
+    branch: "main",
+    tokenPart1: "PASTE_FIRST_HALF_HERE",
+    tokenPart2: "PASTE_SECOND_HALF_HERE"
 };
 
+function getGitHubToken() {
+    return (GITHUB_CONFIG.tokenPart1 + GITHUB_CONFIG.tokenPart2).trim();
+}
+
+/* ==========================================================
+   LOGIN SYSTEM
+========================================================== */
+function checkPassword(){
+    const passwordInput = document.getElementById("passwordInput").value.trim();
+    if(passwordInput === "12345"){
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        initializeApp();
+    } else {
+        document.getElementById("loginError").textContent = "Invalid password";
+    }
+}
+
+document.getElementById("loginButton").addEventListener("click", checkPassword);
+document.getElementById("passwordInput").addEventListener("keydown", event => {
+    if(event.key === "Enter") checkPassword();
+});
+
+/* ==========================================================
+   CONFIGURATION & STATE
+========================================================== */
 const SEARCH_DELAY = 250;
 
 let mediaUrls = [];
@@ -22,139 +48,164 @@ let recentHistory = [];
 const STORAGE = {
     heartMode: "mediaViewerHeartMode",
     swipeMode: "mediaViewerSwipeMode",
-    visited: "mediaViewerVisited"
+    visited: "mediaViewerVisited",
+    heartsLocal: "mediaViewerLocalHearts",
+    seenLocal: "mediaViewerLocalSeen"
 };
 
-let seenItems = new Set();
-let heartedItems = new Set();
+let seenItems = new Set(JSON.parse(localStorage.getItem(STORAGE.seenLocal) || "[]"));
+let heartedItems = new Set(JSON.parse(localStorage.getItem(STORAGE.heartsLocal) || "[]"));
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
-// Auto Play State
-let autoPlayActive = false;
-let autoPlayTimer = null;
-let autoPlayInterval = 5000;
+let heartsDirty = false;
+let seenDirty = false;
+let syncTimeout = null;
 
 /* ==========================================================
-   AUTHENTICATION & INITIALIZATION
-========================================================== */
-function checkPassword(){
-    const tokenInput = document.getElementById("passwordInput").value.trim();
-
-    if(tokenInput.startsWith("ghp_") || tokenInput.startsWith("github_pat_")){
-        GITHUB_CONFIG.token = tokenInput;
-        localStorage.setItem("mediaViewerToken", tokenInput);
-        document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "block";
-        initializeApp();
-    } else {
-        document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
-    }
-}
-
-function logoutGitHub(){
-    if(confirm("Logout and remove saved GitHub token from this device?")){
-        localStorage.removeItem("mediaViewerToken");
-        location.reload();
-    }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-    const loginBtn = document.getElementById("loginButton");
-    const pwdInput = document.getElementById("passwordInput");
-
-    if(loginBtn) loginBtn.addEventListener("click", checkPassword);
-    if(pwdInput) {
-        pwdInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") checkPassword();
-        });
-    }
-
-    if(GITHUB_CONFIG.token){
-        document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "block";
-        initializeApp();
-    }
-});
-
-/* ==========================================================
-   GITHUB API SAVE & LOAD FUNCTIONS
+   OPTIMIZED GITHUB API BATCH SAVE & LOAD
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
+        const token = getGitHubToken();
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
         const res = await fetch(url, {
-            headers: { Authorization: `Bearer ${GITHUB_CONFIG.token}` }
+            headers: { Authorization: `token ${token}` }
         });
         if(!res.ok) return null;
         const data = await res.json();
-        const content = JSON.parse(atob(data.content));
+        const content = JSON.parse(atob(data.content.replace(/\s/g, '')));
         return { content, sha: data.sha };
     } catch(e) {
-        console.log(`Could not load ${path} from GitHub:`, e);
+        console.error(`Could not load ${path} from GitHub:`, e);
         return null;
     }
 }
 
-async function saveGitHubFile(path, dataArray) {
-    const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
-    const existing = await fetchGitHubFile(path);
-    const sha = existing ? existing.sha : undefined;
-    
-    const jsonString = JSON.stringify(dataArray, null, 2);
-    const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
+async function saveGitHubFileDirect(path, dataArray, useKeepalive = false) {
+    try {
+        const token = getGitHubToken();
+        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+        
+        const existing = await fetchGitHubFile(path);
+        const sha = existing ? existing.sha : undefined;
+        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(dataArray, null, 2))));
 
-    const body = {
-        message: `Update ${path} from Mobile Viewer`,
-        content: contentBase64,
-        branch: GITHUB_CONFIG.branch
-    };
-    if(sha) body.sha = sha;
+        const body = {
+            message: `Batch update ${path} from Mobile Viewer`,
+            content: contentBase64,
+            branch: GITHUB_CONFIG.branch
+        };
+        if(sha) body.sha = sha;
 
-    const res = await fetch(url, {
-        method: "PUT",
-        headers: {
-            "Authorization": `Bearer ${GITHUB_CONFIG.token}`,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-    });
-    
-    if(!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || `Failed to commit ${path}`);
+        const options = {
+            method: "PUT",
+            headers: {
+                "Authorization": `token ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+        };
+
+        if(useKeepalive) options.keepalive = true;
+
+        const res = await fetch(url, options);
+        if(!res.ok) {
+            console.error(`GitHub API Save Error for ${path} (${res.status})`);
+        } else {
+            console.log(`Successfully synced ${path} to GitHub.`);
+        }
+    } catch(error) {
+        console.error(`Failed to save ${path} to GitHub:`, error);
     }
 }
+
+function triggerSync() {
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
+    updateStatsDashboard();
+
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(async () => {
+        if (heartsDirty) {
+            await saveGitHubFileDirect("saved_hearts.json", [...heartedItems]);
+            heartsDirty = false;
+        }
+        if (seenDirty) {
+            await saveGitHubFileDirect("seen_media.json", [...seenItems]);
+            seenDirty = false;
+        }
+    }, 3000);
+}
+
+function flushChanges(useKeepalive = false) {
+    if (syncTimeout) clearTimeout(syncTimeout);
+    
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
+
+    if (heartsDirty) {
+        saveGitHubFileDirect("saved_hearts.json", [...heartedItems], useKeepalive);
+        heartsDirty = false;
+    }
+    if (seenDirty) {
+        saveGitHubFileDirect("seen_media.json", [...seenItems], useKeepalive);
+        seenDirty = false;
+    }
+}
+
+async function manualBackupToGitHub() {
+    const statusEl = document.getElementById("status");
+    if(statusEl) statusEl.textContent = "⏳ Backing up to GitHub...";
+
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
+
+    await saveGitHubFileDirect("saved_hearts.json", [...heartedItems]);
+    await saveGitHubFileDirect("seen_media.json", [...seenItems]);
+
+    heartsDirty = false;
+    seenDirty = false;
+
+    if(statusEl) statusEl.textContent = "✅ Manual backup complete!";
+    setTimeout(() => {
+        if(statusEl && statusEl.textContent === "✅ Manual backup complete!") {
+            statusEl.textContent = "";
+        }
+    }, 3000);
+}
+
+window.addEventListener("beforeunload", () => flushChanges(true));
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        flushChanges(true);
+    }
+});
 
 async function loadServerData(){
     const heartsRes = await fetchGitHubFile("saved_hearts.json");
     if(heartsRes && Array.isArray(heartsRes.content)) {
-        heartedItems = new Set(heartsRes.content);
+        heartsRes.content.forEach(id => heartedItems.add(id));
     }
 
     const seenRes = await fetchGitHubFile("seen_media.json");
     if(seenRes && Array.isArray(seenRes.content)) {
-        seenItems = new Set(seenRes.content);
+        seenRes.content.forEach(id => seenItems.add(id));
     }
 
+    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
+    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
     updateStatsDashboard();
 }
 
-async function manualSyncToGitHub(){
-    const statusEl = document.getElementById("status");
-    statusEl.style.color = "#00AAFF";
-    statusEl.textContent = "💾 Saving hearts and seen data to GitHub...";
+function saveHearts(){
+    heartsDirty = true;
+    triggerSync();
+}
 
-    try {
-        await saveGitHubFile("saved_hearts.json", [...heartedItems]);
-        await saveGitHubFile("seen_media.json", [...seenItems]);
-        statusEl.style.color = "#2ecc71";
-        statusEl.textContent = "✅ Successfully saved to GitHub!";
-        setTimeout(() => { statusEl.textContent = ""; }, 4000);
-    } catch(error) {
-        statusEl.style.color = "#ff6666";
-        statusEl.textContent = "❌ Failed to save: " + error.message;
-    }
+function saveSeen(){
+    seenDirty = true;
+    triggerSync();
 }
 
 function saveSettings(){
@@ -190,7 +241,7 @@ function showWelcome(){
     const visited = localStorage.getItem(STORAGE.visited);
     if(!visited){
         const banner = document.getElementById("welcomeBanner");
-        if(banner){
+        if(banner) {
             banner.style.display = "block";
             setTimeout(() => { banner.style.display = "none"; }, 5000);
         }
@@ -199,7 +250,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA DETECTION & PRELOADING
+   MEDIA DETECTION
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
@@ -215,17 +266,6 @@ function normalizeImageURL(url){
         src = src.replace("imgur.com/", "i.imgur.com/") + ".jpg";
     }
     return src;
-}
-
-function preloadNextItems(){
-    const preloadCount = 3;
-    for(let i = currentIndex; i < Math.min(currentIndex + preloadCount, workingList.length); i++){
-        const item = workingList[i];
-        if(item && isImage(item.url)){
-            const img = new Image();
-            img.src = normalizeImageURL(item.url);
-        }
-    }
 }
 
 function createMediaElement(item){
@@ -278,21 +318,22 @@ function debouncedSearch(){
     searchTimer = setTimeout(applySearch, SEARCH_DELAY);
 }
 
-const searchInputEl = document.getElementById("searchInput");
-if(searchInputEl) {
-    searchInputEl.addEventListener("input", debouncedSearch);
+const searchInput = document.getElementById("searchInput");
+if(searchInput) {
+    searchInput.addEventListener("input", debouncedSearch);
 }
 
 /* ==========================================================
-   HEART SYSTEM & DOUBLE TAP WITH AUTO-NEXT IN SWIPE MODE
+   HEART SYSTEM & DOUBLE TAP
 ========================================================== */
 function toggleHeart(index){
-    const wasHearted = heartedItems.has(index);
-    if(wasHearted){
+    if(heartedItems.has(index)){
         heartedItems.delete(index);
     } else {
         heartedItems.add(index);
     }
+
+    saveHearts();
 
     document.querySelectorAll(".heart-btn").forEach(btn => {
         if(Number(btn.dataset.index) === index){
@@ -303,22 +344,8 @@ function toggleHeart(index){
         }
     });
 
-    updateStatsDashboard();
-
     if(heartMode && !heartedItems.has(index)){
         applySearch();
-    }
-
-    // Auto next item if in Swipe Mode and the item was newly hearted
-    if(swipeMode && !wasHearted) {
-        setTimeout(() => {
-            currentIndex++;
-            if(currentIndex >= workingList.length) {
-                currentIndex = 0;
-            }
-            render();
-            snapToTop();
-        }, 200);
     }
 }
 
@@ -355,38 +382,6 @@ function toggleSwipeMode(){
 }
 
 /* ==========================================================
-   AUTO PLAY SYSTEM
-========================================================== */
-function toggleAutoPlay(){
-    autoPlayActive = !autoPlayActive;
-    if(autoPlayActive){
-        startAutoPlayTimer();
-    } else {
-        stopAutoPlayTimer();
-    }
-    renderControls();
-}
-
-function startAutoPlayTimer(){
-    stopAutoPlayTimer();
-    autoPlayTimer = setInterval(() => {
-        nextRandomPage();
-    }, autoPlayInterval);
-}
-
-function stopAutoPlayTimer(){
-    if(autoPlayTimer) clearInterval(autoPlayTimer);
-    autoPlayTimer = null;
-}
-
-function changeAutoPlaySpeed(val){
-    autoPlayInterval = Number(val);
-    if(autoPlayActive){
-        startAutoPlayTimer();
-    }
-}
-
-/* ==========================================================
    RECENTLY VIEWED HISTORY DRAWER
 ========================================================== */
 function addToHistory(item){
@@ -397,7 +392,7 @@ function addToHistory(item){
 
 function toggleHistoryModal(){
     const modal = document.getElementById("historyModal");
-    if(modal){
+    if(modal) {
         modal.classList.toggle("hidden");
         if(!modal.classList.contains("hidden")){
             renderHistoryList();
@@ -408,7 +403,6 @@ function toggleHistoryModal(){
 function renderHistoryList(){
     const container = document.getElementById("historyListContainer");
     if(!container) return;
-
     if(recentHistory.length === 0){
         container.innerHTML = '<p style="color:#777; text-align:center;">No recent history yet.</p>';
         return;
@@ -439,12 +433,15 @@ function jumpToHistoryItem(index){
     snapToTop();
 }
 
-async function clearAllData(){
-    if(!confirm("Clear all hearts and seen media history locally and on GitHub?")) return;
+function clearHearts(){
+    if(!confirm("Clear all hearts and seen media history?")) return;
 
     heartedItems.clear();
     seenItems.clear();
     recentHistory = [];
+
+    saveHearts();
+    saveSeen();
 
     document.querySelectorAll(".heart-btn").forEach(btn => {
         btn.textContent = "♡";
@@ -452,27 +449,11 @@ async function clearAllData(){
     });
 
     applySearch();
+}
 
-    const statusEl = document.getElementById("status");
-    if(statusEl) {
-        statusEl.style.color = "#00AAFF";
-        statusEl.textContent = "🗑 Clearing data on GitHub...";
-    }
-
-    try {
-        await saveGitHubFile("saved_hearts.json", []);
-        await saveGitHubFile("seen_media.json", []);
-        if(statusEl) {
-            statusEl.style.color = "#2ecc71";
-            statusEl.textContent = "✅ Successfully cleared and saved to GitHub!";
-            setTimeout(() => { statusEl.textContent = ""; }, 4000);
-        }
-    } catch(error) {
-        if(statusEl) {
-            statusEl.style.color = "#ff6666";
-            statusEl.textContent = "❌ Failed to clear on GitHub: " + error.message;
-        }
-    }
+// Alias to match index.html clear button function name
+function clearAllData() {
+    clearHearts();
 }
 
 /* ==========================================================
@@ -480,8 +461,8 @@ async function clearAllData(){
 ========================================================== */
 function buildDisplayList(){
     let list = [...mediaUrls];
-    const queryEl = document.getElementById("searchInput");
-    const query = queryEl ? queryEl.value.toLowerCase().trim() : "";
+    const queryElement = document.getElementById("searchInput");
+    const query = queryElement ? queryElement.value.toLowerCase().trim() : "";
 
     if(query){
         const number = query.replace("#","");
@@ -509,7 +490,7 @@ function setupObserver(){
                     const index = Number(entry.target.dataset.index);
                     if(index && !heartMode && !seenItems.has(index)){
                         seenItems.add(index);
-                        updateStatsDashboard();
+                        saveSeen();
 
                         const numberEl = document.getElementById(`num-${index}`);
                         if(numberEl && !numberEl.querySelector(".seen-badge")) {
@@ -537,48 +518,31 @@ function setupObserver(){
 ========================================================== */
 function renderControls(){
     const html = `
-        <div style="display:flex; justify-content:center; gap:4px; margin-bottom:4px; flex-wrap:wrap;">
-            <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-            <button class="swipe-mode-btn" onclick="toggleSwipeMode()">${swipeMode ? "📱 Swipe: ON" : "📱 Swipe: OFF"}</button>
-            <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
-            <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
-        </div>
-        <div style="display:flex; justify-content:center; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:4px;">
-            <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
-            <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
-            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:7px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:12px;">
-                <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
-                <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
-                <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
-                <option value="12000" ${autoPlayInterval === 12000 ? 'selected' : ''}>12s</option>
-            </select>
-        </div>
+        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
+        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
+        <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+        <button class="backup-btn" onclick="manualBackupToGitHub()" style="background:#27ae60; color:white;">💾 Backup</button>
     `;
-    const topC = document.getElementById("topControls");
-    const botC = document.getElementById("bottomControls");
-    if(topC) topC.innerHTML = html;
-    if(botC) botC.innerHTML = html;
+    const topCtrl = document.getElementById("topControls");
+    const botCtrl = document.getElementById("bottomControls");
+    if(topCtrl) topCtrl.innerHTML = html;
+    if(botCtrl) botCtrl.innerHTML = html;
 }
 
 function render(){
     renderControls();
     updateStatsDashboard();
 
-    if(swipeMode){
-        document.body.classList.add("swipe-mode-active");
-    } else {
-        document.body.classList.remove("swipe-mode-active");
-    }
-
     const container = document.getElementById("mediaContainer");
+    const statusEl = document.getElementById("status");
     if(!container) return;
     container.innerHTML = "";
-    
-    const statusEl = document.getElementById("status");
     if(statusEl) statusEl.textContent = "";
 
     const pageSize = swipeMode ? 1 : 15;
     let shown = 0;
+    let lastTapTime = 0;
 
     while(shown < pageSize && currentIndex < workingList.length){
         const item = workingList[currentIndex];
@@ -620,19 +584,40 @@ function render(){
 
         const media = createMediaElement(item);
         if(media) {
-            media.addEventListener("dblclick", (e) => {
-                e.preventDefault();
-                handleDoubleTap(item.index, wrapper);
+            media.addEventListener("click", (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                if (tapLength < 300 && tapLength > 0) {
+                    e.preventDefault();
+                    handleDoubleTap(item.index, wrapper);
+                }
+                lastTapTime = currentTime;
             });
             wrapper.appendChild(media);
+        }
+
+        if(swipeMode){
+            const swipeActions = document.createElement("div");
+            swipeActions.className = "swipe-actions";
+            swipeActions.innerHTML = `
+                <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
+                <button class="swipe-action-btn" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
+            `;
+            wrapper.appendChild(swipeActions);
+
+            if(!heartMode && !seenItems.has(item.index)){
+                seenItems.add(item.index);
+                saveSeen();
+            }
         }
 
         container.appendChild(wrapper);
         shown++;
     }
 
-    preloadNextItems();
-    setupObserver();
+    if(!swipeMode){
+        setupObserver();
+    }
 }
 
 /* ==========================================================
@@ -640,12 +625,12 @@ function render(){
 ========================================================== */
 function nextRandomPage(){
     snapToTop();
+    const statusEl = document.getElementById("status");
 
     if(heartMode){
         if(currentIndex >= workingList.length){
             shuffleArray(workingList);
             currentIndex = 0;
-            const statusEl = document.getElementById("status");
             if(statusEl) statusEl.textContent = "❤️ All hearts viewed! Reshuffling hearts.";
         }
     } else {
@@ -655,9 +640,9 @@ function nextRandomPage(){
 
         if(workingList.length === 0){
             seenItems.clear();
+            saveSeen();
             workingList = buildDisplayList();
             shuffleArray(workingList);
-            const statusEl = document.getElementById("status");
             if(statusEl) statusEl.textContent = "🎉 Cycle complete. Starting again.";
         }
     }
@@ -686,6 +671,6 @@ async function initializeApp(){
         render();
     } catch(error) {
         const statusEl = document.getElementById("status");
-        if(statusEl) statusEl.textContent = "❌ Error loading media list: " + error.message;
+        if(statusEl) statusEl.textContent = "Error: " + error.message;
     }
 }
