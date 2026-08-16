@@ -1,40 +1,14 @@
 /* ==========================================================
-   GITHUB CONFIGURATION (For iPhone & PC Sync)
+   APP.JS - Media Viewer V4.3 Logic
 ========================================================== */
+
 const GITHUB_CONFIG = {
-    owner: "BotTime63",
-    repo: "goldCarv2",
-    branch: "main",
-    tokenPart1: "PASTE_FIRST_HALF_HERE",
-    tokenPart2: "PASTE_SECOND_HALF_HERE"
+    owner: "bottime63",
+    repo: "goldCarv2", // Updated to match your repo goldCarv2
+    token: localStorage.getItem("mediaViewerToken") || "",
+    branch: "main"
 };
 
-function getGitHubToken() {
-    return (GITHUB_CONFIG.tokenPart1 + GITHUB_CONFIG.tokenPart2).trim();
-}
-
-/* ==========================================================
-   LOGIN SYSTEM
-========================================================== */
-function checkPassword(){
-    const passwordInput = document.getElementById("passwordInput").value.trim();
-    if(passwordInput === "12345"){
-        document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "block";
-        initializeApp();
-    } else {
-        document.getElementById("loginError").textContent = "Invalid password";
-    }
-}
-
-document.getElementById("loginButton").addEventListener("click", checkPassword);
-document.getElementById("passwordInput").addEventListener("keydown", event => {
-    if(event.key === "Enter") checkPassword();
-});
-
-/* ==========================================================
-   CONFIGURATION & STATE
-========================================================== */
 const SEARCH_DELAY = 250;
 
 let mediaUrls = [];
@@ -45,173 +19,136 @@ let observer = null;
 let observerTimeout = null;
 let recentHistory = [];
 
-// Auto-Play State
-let autoPlayIntervalId = null;
-let autoPlaySpeedIndex = 0; // 0: OFF, 1: 2s, 2: 4s, 3: 6s
-const AUTO_PLAY_SPEEDS = [0, 2000, 4000, 6000];
-const AUTO_PLAY_LABELS = ["▶️ Auto: OFF", "▶️ Auto: 2s", "▶️ Auto: 4s", "▶️ Auto: 6s"];
-
 const STORAGE = {
     heartMode: "mediaViewerHeartMode",
     swipeMode: "mediaViewerSwipeMode",
-    visited: "mediaViewerVisited",
-    heartsLocal: "mediaViewerLocalHearts",
-    seenLocal: "mediaViewerLocalSeen"
+    visited: "mediaViewerVisited"
 };
 
-let seenItems = new Set(JSON.parse(localStorage.getItem(STORAGE.seenLocal) || "[]"));
-let heartedItems = new Set(JSON.parse(localStorage.getItem(STORAGE.heartsLocal) || "[]"));
+let seenItems = new Set();
+let heartedItems = new Set();
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
-let heartsDirty = false;
-let seenDirty = false;
-let syncTimeout = null;
+// Auto Play State
+let autoPlayActive = false;
+let autoPlayTimer = null;
+let autoPlayInterval = 5000; // Default 5 seconds
 
 /* ==========================================================
-   OPTIMIZED GITHUB API BATCH SAVE & LOAD
+   AUTHENTICATION & INITIALIZATION
+========================================================== */
+function checkPassword(){
+    const tokenInput = document.getElementById("passwordInput").value.trim();
+
+    if(tokenInput.startsWith("ghp_") || tokenInput.startsWith("github_pat_")){
+        GITHUB_CONFIG.token = tokenInput;
+        localStorage.setItem("mediaViewerToken", tokenInput);
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        initializeApp();
+    } else {
+        document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
+    }
+}
+
+function logoutGitHub(){
+    if(confirm("Logout and remove saved GitHub token from this device?")){
+        localStorage.removeItem("mediaViewerToken");
+        location.reload();
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const loginBtn = document.getElementById("loginButton");
+    const pwdInput = document.getElementById("passwordInput");
+
+    if(loginBtn) loginBtn.addEventListener("click", checkPassword);
+    if(pwdInput) {
+        pwdInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") checkPassword();
+        });
+    }
+
+    if(GITHUB_CONFIG.token){
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        initializeApp();
+    }
+});
+
+/* ==========================================================
+   GITHUB API SAVE & LOAD FUNCTIONS
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
-        const token = getGitHubToken();
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
         const res = await fetch(url, {
-            headers: { Authorization: `token ${token}` }
+            headers: { Authorization: `token ${GITHUB_CONFIG.token}` }
         });
         if(!res.ok) return null;
         const data = await res.json();
-        const content = JSON.parse(atob(data.content.replace(/\s/g, '')));
+        const content = JSON.parse(atob(data.content));
         return { content, sha: data.sha };
     } catch(e) {
-        console.error(`Could not load ${path} from GitHub:`, e);
+        console.log(`Could not load ${path} from GitHub:`, e);
         return null;
     }
 }
 
-async function saveGitHubFileDirect(path, dataArray, useKeepalive = false) {
-    try {
-        const token = getGitHubToken();
-        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
-        
-        const existing = await fetchGitHubFile(path);
-        const sha = existing ? existing.sha : undefined;
-        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(dataArray, null, 2))));
+async function saveGitHubFile(path, dataArray) {
+    const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+    const existing = await fetchGitHubFile(path);
+    const sha = existing ? existing.sha : undefined;
+    const contentBase64 = btoa(JSON.stringify(dataArray, null, 2));
 
-        const body = {
-            message: `Batch update ${path} from Mobile Viewer`,
-            content: contentBase64,
-            branch: GITHUB_CONFIG.branch
-        };
-        if(sha) body.sha = sha;
+    const body = {
+        message: `Update ${path} from Mobile Viewer`,
+        content: contentBase64,
+        branch: GITHUB_CONFIG.branch
+    };
+    if(sha) body.sha = sha;
 
-        const options = {
-            method: "PUT",
-            headers: {
-                "Authorization": `token ${token}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(body)
-        };
-
-        if(useKeepalive) options.keepalive = true;
-
-        const res = await fetch(url, options);
-        if(!res.ok) {
-            console.error(`GitHub API Save Error for ${path} (${res.status})`);
-        } else {
-            console.log(`Successfully synced ${path} to GitHub.`);
-        }
-    } catch(error) {
-        console.error(`Failed to save ${path} to GitHub:`, error);
-    }
+    const res = await fetch(url, {
+        method: "PUT",
+        headers: {
+            "Authorization": `token ${GITHUB_CONFIG.token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error(`Failed to commit ${path}`);
 }
-
-function triggerSync() {
-    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
-    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
-    updateStatsDashboard();
-
-    if (syncTimeout) clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(async () => {
-        if (heartsDirty) {
-            await saveGitHubFileDirect("saved_hearts.json", [...heartedItems]);
-            heartsDirty = false;
-        }
-        if (seenDirty) {
-            await saveGitHubFileDirect("seen_media.json", [...seenItems]);
-            seenDirty = false;
-        }
-    }, 3000);
-}
-
-function flushChanges(useKeepalive = false) {
-    if (syncTimeout) clearTimeout(syncTimeout);
-    
-    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
-    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
-
-    if (heartsDirty) {
-        saveGitHubFileDirect("saved_hearts.json", [...heartedItems], useKeepalive);
-        heartsDirty = false;
-    }
-    if (seenDirty) {
-        saveGitHubFileDirect("seen_media.json", [...seenItems], useKeepalive);
-        seenDirty = false;
-    }
-}
-
-async function manualBackupToGitHub() {
-    const statusEl = document.getElementById("status");
-    if(statusEl) statusEl.textContent = "⏳ Backing up to GitHub...";
-
-    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
-    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
-
-    await saveGitHubFileDirect("saved_hearts.json", [...heartedItems]);
-    await saveGitHubFileDirect("seen_media.json", [...seenItems]);
-
-    heartsDirty = false;
-    seenDirty = false;
-
-    if(statusEl) statusEl.textContent = "✅ Manual backup complete!";
-    setTimeout(() => {
-        if(statusEl && statusEl.textContent === "✅ Manual backup complete!") {
-            statusEl.textContent = "";
-        }
-    }, 3000);
-}
-
-window.addEventListener("beforeunload", () => flushChanges(true));
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
-        flushChanges(true);
-    }
-});
 
 async function loadServerData(){
     const heartsRes = await fetchGitHubFile("saved_hearts.json");
     if(heartsRes && Array.isArray(heartsRes.content)) {
-        heartsRes.content.forEach(id => heartedItems.add(id));
+        heartedItems = new Set(heartsRes.content);
     }
 
     const seenRes = await fetchGitHubFile("seen_media.json");
     if(seenRes && Array.isArray(seenRes.content)) {
-        seenRes.content.forEach(id => seenItems.add(id));
+        seenItems = new Set(seenRes.content);
     }
 
-    localStorage.setItem(STORAGE.heartsLocal, JSON.stringify([...heartedItems]));
-    localStorage.setItem(STORAGE.seenLocal, JSON.stringify([...seenItems]));
     updateStatsDashboard();
 }
 
-function saveHearts(){
-    heartsDirty = true;
-    triggerSync();
-}
+async function manualSyncToGitHub(){
+    const statusEl = document.getElementById("status");
+    statusEl.style.color = "#00AAFF";
+    statusEl.textContent = "💾 Saving hearts and seen data to GitHub...";
 
-function saveSeen(){
-    seenDirty = true;
-    triggerSync();
+    try {
+        await saveGitHubFile("saved_hearts.json", [...heartedItems]);
+        await saveGitHubFile("seen_media.json", [...seenItems]);
+        statusEl.style.color = "#2ecc71";
+        statusEl.textContent = "✅ Successfully saved to GitHub!";
+        setTimeout(() => { statusEl.textContent = ""; }, 4000);
+    } catch(error) {
+        statusEl.style.color = "#ff6666";
+        statusEl.textContent = "❌ Failed to save: " + error.message;
+    }
 }
 
 function saveSettings(){
@@ -247,7 +184,7 @@ function showWelcome(){
     const visited = localStorage.getItem(STORAGE.visited);
     if(!visited){
         const banner = document.getElementById("welcomeBanner");
-        if(banner) {
+        if(banner){
             banner.style.display = "block";
             setTimeout(() => { banner.style.display = "none"; }, 5000);
         }
@@ -324,23 +261,20 @@ function debouncedSearch(){
     searchTimer = setTimeout(applySearch, SEARCH_DELAY);
 }
 
-const searchInput = document.getElementById("searchInput");
-if(searchInput) {
-    searchInput.addEventListener("input", debouncedSearch);
+const searchInputEl = document.getElementById("searchInput");
+if(searchInputEl) {
+    searchInputEl.addEventListener("input", debouncedSearch);
 }
 
 /* ==========================================================
    HEART SYSTEM & DOUBLE TAP
 ========================================================== */
 function toggleHeart(index){
-    const wasHearted = heartedItems.has(index);
-    if(wasHearted){
+    if(heartedItems.has(index)){
         heartedItems.delete(index);
     } else {
         heartedItems.add(index);
     }
-
-    saveHearts();
 
     document.querySelectorAll(".heart-btn").forEach(btn => {
         if(Number(btn.dataset.index) === index){
@@ -351,13 +285,23 @@ function toggleHeart(index){
         }
     });
 
+    document.querySelectorAll(".swipe-action-btn").forEach(btn => {
+        if(btn.dataset.index == index) {
+            btn.textContent = heartedItems.has(index) ? "❤️ Unheart" : "❤️ Heart";
+        }
+    });
+
+    updateStatsDashboard();
+
     if(heartMode && !heartedItems.has(index)){
         applySearch();
     }
 
-    // Auto-advance in swipe mode when hearting
-    if(swipeMode && !wasHearted && heartedItems.has(index)){
-        nextRandomPage();
+    // In swipe mode, if heart is added, auto go to the next item immediately
+    if(swipeMode && heartedItems.has(index)){
+        setTimeout(() => {
+            nextRandomPage();
+        }, 350);
     }
 }
 
@@ -394,29 +338,35 @@ function toggleSwipeMode(){
 }
 
 /* ==========================================================
-   AUTO-PLAY MODE
+   AUTO PLAY SYSTEM
 ========================================================== */
-function toggleAutoPlaySpeed() {
-    autoPlaySpeedIndex = (autoPlaySpeedIndex + 1) % AUTO_PLAY_SPEEDS.length;
-    
-    if (autoPlayIntervalId) {
-        clearInterval(autoPlayIntervalId);
-        autoPlayIntervalId = null;
+function toggleAutoPlay(){
+    autoPlayActive = !autoPlayActive;
+    if(autoPlayActive){
+        startAutoPlayTimer();
+    } else {
+        stopAutoPlayTimer();
     }
-
-    const speed = AUTO_PLAY_SPEEDS[autoPlaySpeedIndex];
-    if (speed > 0) {
-        // Automatically ensure swipe mode is on for best auto-play experience
-        if (!swipeMode) {
-            swipeMode = true;
-            saveSettings();
-        }
-        autoPlayIntervalId = setInterval(() => {
-            nextRandomPage();
-        }, speed);
-    }
-
     renderControls();
+}
+
+function startAutoPlayTimer(){
+    stopAutoPlayTimer();
+    autoPlayTimer = setInterval(() => {
+        nextRandomPage();
+    }, autoPlayInterval);
+}
+
+function stopAutoPlayTimer(){
+    if(autoPlayTimer) clearInterval(autoPlayTimer);
+    autoPlayTimer = null;
+}
+
+function changeAutoPlaySpeed(val){
+    autoPlayInterval = Number(val);
+    if(autoPlayActive){
+        startAutoPlayTimer();
+    }
 }
 
 /* ==========================================================
@@ -430,7 +380,7 @@ function addToHistory(item){
 
 function toggleHistoryModal(){
     const modal = document.getElementById("historyModal");
-    if(modal) {
+    if(modal){
         modal.classList.toggle("hidden");
         if(!modal.classList.contains("hidden")){
             renderHistoryList();
@@ -441,6 +391,7 @@ function toggleHistoryModal(){
 function renderHistoryList(){
     const container = document.getElementById("historyListContainer");
     if(!container) return;
+
     if(recentHistory.length === 0){
         container.innerHTML = '<p style="color:#777; text-align:center;">No recent history yet.</p>';
         return;
@@ -471,15 +422,12 @@ function jumpToHistoryItem(index){
     snapToTop();
 }
 
-function clearHearts(){
-    if(!confirm("Clear all hearts and seen media history?")) return;
+function clearAllData(){
+    if(!confirm("Clear all hearts and seen media history? (Don't forget to click Save to GitHub afterwards to commit changes!)")) return;
 
     heartedItems.clear();
     seenItems.clear();
     recentHistory = [];
-
-    saveHearts();
-    saveSeen();
 
     document.querySelectorAll(".heart-btn").forEach(btn => {
         btn.textContent = "♡";
@@ -489,17 +437,13 @@ function clearHearts(){
     applySearch();
 }
 
-function clearAllData() {
-    clearHearts();
-}
-
 /* ==========================================================
    BUILD DISPLAY LIST
 ========================================================== */
 function buildDisplayList(){
     let list = [...mediaUrls];
-    const queryElement = document.getElementById("searchInput");
-    const query = queryElement ? queryElement.value.toLowerCase().trim() : "";
+    const queryEl = document.getElementById("searchInput");
+    const query = queryEl ? queryEl.value.toLowerCase().trim() : "";
 
     if(query){
         const number = query.replace("#","");
@@ -527,7 +471,7 @@ function setupObserver(){
                     const index = Number(entry.target.dataset.index);
                     if(index && !heartMode && !seenItems.has(index)){
                         seenItems.add(index);
-                        saveSeen();
+                        updateStatsDashboard();
 
                         const numberEl = document.getElementById(`num-${index}`);
                         if(numberEl && !numberEl.querySelector(".seen-badge")) {
@@ -551,24 +495,31 @@ function setupObserver(){
 }
 
 /* ==========================================================
-   RENDER SYSTEM
+   RENDER SYSTEM (Layout order: History, Swipe, Hearts, Random)
 ========================================================== */
 function renderControls(){
-    const autoPlayLabel = AUTO_PLAY_LABELS[autoPlaySpeedIndex];
-    const autoPlayBg = autoPlaySpeedIndex > 0 ? "#8e44ad" : "#34495e";
-
     const html = `
-        <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
-        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
-        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
-        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-        <button class="autoplay-btn" onclick="toggleAutoPlaySpeed()" style="background:${autoPlayBg}; color:white;">${autoPlayLabel}</button>
-        <button class="backup-btn" onclick="manualBackupToGitHub()" style="background:#27ae60; color:white;">💾 Backup</button>
+        <div style="display:flex; justify-content:center; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
+            <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+            <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
+            <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+            <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
+        </div>
+        <div style="display:flex; justify-content:center; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:5px;">
+            <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
+            <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
+            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:7px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:12px;">
+                <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
+                <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
+                <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
+                <option value="12000" ${autoPlayInterval === 12000 ? 'selected' : ''}>12s</option>
+            </select>
+        </div>
     `;
-    const topCtrl = document.getElementById("topControls");
-    const botCtrl = document.getElementById("bottomControls");
-    if(topCtrl) topCtrl.innerHTML = html;
-    if(botCtrl) botCtrl.innerHTML = html;
+    const topC = document.getElementById("topControls");
+    const botC = document.getElementById("bottomControls");
+    if(topC) topC.innerHTML = html;
+    if(botC) botC.innerHTML = html;
 }
 
 function render(){
@@ -576,9 +527,10 @@ function render(){
     updateStatsDashboard();
 
     const container = document.getElementById("mediaContainer");
-    const statusEl = document.getElementById("status");
     if(!container) return;
     container.innerHTML = "";
+    
+    const statusEl = document.getElementById("status");
     if(statusEl) statusEl.textContent = "";
 
     const pageSize = swipeMode ? 1 : 15;
@@ -642,14 +594,37 @@ function render(){
             swipeActions.className = "swipe-actions";
             swipeActions.innerHTML = `
                 <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
-                <button class="swipe-action-btn" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
+                <button class="swipe-action-btn" data-index="${item.index}" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
             `;
             wrapper.appendChild(swipeActions);
 
             if(!heartMode && !seenItems.has(item.index)){
                 seenItems.add(item.index);
-                saveSeen();
+                updateStatsDashboard();
             }
+
+            let touchStartX = 0;
+            let touchEndX = 0;
+
+            wrapper.addEventListener("touchstart", (e) => {
+                if(e.touches.length === 1) {
+                    touchStartX = e.changedTouches[0].screenX;
+                }
+            }, {passive: true});
+
+            wrapper.addEventListener("touchend", (e) => {
+                if(e.changedTouches.length === 1) {
+                    touchEndX = e.changedTouches[0].screenX;
+                    const diff = touchEndX - touchStartX;
+                    if (Math.abs(diff) > 70) {
+                        if (diff < 0) {
+                            nextRandomPage();
+                        } else {
+                            toggleHeart(item.index);
+                        }
+                    }
+                }
+            }, {passive: true});
         }
 
         container.appendChild(wrapper);
@@ -666,12 +641,12 @@ function render(){
 ========================================================== */
 function nextRandomPage(){
     snapToTop();
-    const statusEl = document.getElementById("status");
 
     if(heartMode){
         if(currentIndex >= workingList.length){
             shuffleArray(workingList);
             currentIndex = 0;
+            const statusEl = document.getElementById("status");
             if(statusEl) statusEl.textContent = "❤️ All hearts viewed! Reshuffling hearts.";
         }
     } else {
@@ -681,9 +656,9 @@ function nextRandomPage(){
 
         if(workingList.length === 0){
             seenItems.clear();
-            saveSeen();
             workingList = buildDisplayList();
             shuffleArray(workingList);
+            const statusEl = document.getElementById("status");
             if(statusEl) statusEl.textContent = "🎉 Cycle complete. Starting again.";
         }
     }
