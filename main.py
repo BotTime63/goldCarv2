@@ -7,52 +7,110 @@ HEARTS_FILE = "saved_hearts.json"
 SEEN_FILE = "seen_media.json"
 
 
-class LocalMediaHandler(http.server.SimpleHTTPRequestHandler):
+class MediaViewerHandler(http.server.SimpleHTTPRequestHandler):
+
+    def send_json(self, status, data):
+        response = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
+
+    def do_GET(self):
+        if self.path == "/load-data":
+            try:
+                hearts = self.load_file(HEARTS_FILE)
+                seen = self.load_file(SEEN_FILE)
+
+                self.send_json(200, {
+                    "hearts": hearts,
+                    "seen": seen
+                })
+            except Exception as e:
+                self.send_json(500, {"error": str(e)})
+            return
+
+        super().do_GET()
 
     def do_POST(self):
-        target_file = None
-        if self.path == "/save-hearts":
-            target_file = HEARTS_FILE
-        elif self.path == "/save-seen":
-            target_file = SEEN_FILE
+        files = {
+            "/save-hearts": HEARTS_FILE,
+            "/save-seen": SEEN_FILE
+        }
 
-        if target_file:
-            try:
-                content_length = int(self.headers["Content-Length"])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data.decode("utf-8"))
-                with open(target_file, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
+        filename = files.get(self.path)
 
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"status": "success"}')
-                print(f"📥 Saved {len(data)} items to {target_file}")
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
+        if not filename:
+            self.send_json(404, {"error": "Unknown endpoint"})
+            return
+
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode("utf-8"))
+
+            if not isinstance(data, list):
+                raise ValueError("Data must be a JSON array")
+
+            self.save_file(filename, data)
+
+            print(f"Saved {len(data)} items to {filename}")
+
+            self.send_json(200, {
+                "status": "success",
+                "file": filename,
+                "count": len(data)
+            })
+
+        except Exception as e:
+            print(f"Save error: {e}")
+            self.send_json(500, {"error": str(e)})
+
+    @staticmethod
+    def load_file(filename):
+        if not os.path.exists(filename):
+            return []
+
+        with open(filename, "r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        if not isinstance(data, list):
+            return []
+
+        return data
+
+    @staticmethod
+    def save_file(filename, data):
+        temp_file = filename + ".tmp"
+
+        with open(temp_file, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=2)
+
+        os.replace(temp_file, filename)
 
 
 if __name__ == "__main__":
-    for filename in [HEARTS_FILE, SEEN_FILE]:
+    for filename in (HEARTS_FILE, SEEN_FILE):
         if not os.path.exists(filename):
-            with open(filename, "w", encoding="utf-8") as f:
-                json.dump([], f)
+            with open(filename, "w", encoding="utf-8") as file:
+                json.dump([], file)
 
-    print("=" * 60)
-    print("🚀 LOCAL SERVER RUNNING (Hearts + Seen Tracking)")
-    print(f"👉 Open your browser to: http://localhost:{PORT}/index.html")
-    print("=" * 60)
+    print("=" * 50)
+    print("MEDIA VIEWER LOCAL SERVER")
+    print("=" * 50)
+    print(f"Open: http://localhost:{PORT}/index.html")
+    print("Hearts: saved_hearts.json")
+    print("Seen:   seen_media.json")
+    print("=" * 50)
 
-    server_address = ("", PORT)
-    httpd = http.server.HTTPServer(server_address, LocalMediaHandler)
+    server = http.server.ThreadingHTTPServer(
+        ("", PORT),
+        MediaViewerHandler
+    )
+
     try:
-        httpd.serve_forever()
+        server.serve_forever()
     except KeyboardInterrupt:
         print("\nServer stopped.")
+        server.server_close()
