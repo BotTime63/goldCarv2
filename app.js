@@ -1,3 +1,87 @@
+/* ==========================================================
+   GITHUB CONFIGURATION
+========================================================== */
+const GITHUB_CONFIG = {
+    owner: "BotTime63",
+    repo: "goldCarv2",
+    branch: "main",
+    token: ""
+};
+
+/* ==========================================================
+   GITHUB TOKEN
+========================================================== */
+function getGitHubToken(){
+    return GITHUB_CONFIG.token.trim();
+}
+
+async function verifyGitHubToken(token){
+    const res = await fetch("https://api.github.com/user", {
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Accept": "application/vnd.github+json"
+        }
+    });
+
+    if(!res.ok){
+        let message = "GitHub rejected the token.";
+        try {
+            const data = await res.json();
+            if(data.message) message = data.message;
+        } catch(e) {}
+        throw new Error(message);
+    }
+
+    return true;
+}
+
+/* ==========================================================
+   LOGIN SYSTEM
+========================================================== */
+async function checkPassword(){
+    const input = document.getElementById("passwordInput");
+    const errorEl = document.getElementById("loginError");
+    const button = document.getElementById("loginButton");
+
+    const token = input.value.trim();
+
+    if(!token.startsWith("ghp_") && !token.startsWith("github_pat_")){
+        errorEl.textContent = "Invalid token format.";
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Checking...";
+    errorEl.textContent = "";
+
+    try {
+        GITHUB_CONFIG.token = token;
+
+        await verifyGitHubToken(token);
+
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+
+        await initializeApp();
+    } catch(error) {
+        GITHUB_CONFIG.token = "";
+        errorEl.textContent = "GitHub login failed: " + error.message;
+        button.disabled = false;
+        button.textContent = "Enter";
+    }
+}
+
+document.getElementById("loginButton").addEventListener("click", checkPassword);
+
+document.getElementById("passwordInput").addEventListener("keydown", event => {
+    if(event.key === "Enter"){
+        checkPassword();
+    }
+});
+
+/* ==========================================================
+   CONFIGURATION & STATE
+========================================================== */
 const SEARCH_DELAY = 250;
 
 let mediaUrls = [];
@@ -12,156 +96,343 @@ const STORAGE = {
     heartMode: "mediaViewerHeartMode",
     swipeMode: "mediaViewerSwipeMode",
     visited: "mediaViewerVisited",
-    hearts: "mediaViewerHearts",
-    seen: "mediaViewerSeen"
+    heartsLocal: "mediaViewerLocalHearts",
+    seenLocal: "mediaViewerLocalSeen"
 };
 
-let seenItems = new Set();
-let heartedItems = new Set();
+let seenItems = new Set(
+    JSON.parse(localStorage.getItem(STORAGE.seenLocal) || "[]")
+);
+
+let heartedItems = new Set(
+    JSON.parse(localStorage.getItem(STORAGE.heartsLocal) || "[]")
+);
+
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
-function checkPassword() {
-    const password = document.getElementById("passwordInput").value.trim();
+let heartsDirty = false;
+let seenDirty = false;
+let syncTimeout = null;
 
-    if(password === "12345") {
-        document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "block";
-        initializeApp();
-    } else {
-        document.getElementById("loginError").textContent = "Invalid password";
+/* ==========================================================
+   GITHUB API LOAD
+========================================================== */
+async function fetchGitHubFile(path){
+    try {
+        const token = getGitHubToken();
+
+        if(!token){
+            throw new Error("No GitHub token.");
+        }
+
+        const url =
+            `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+
+        const res = await fetch(url, {
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Accept": "application/vnd.github+json"
+            }
+        });
+
+        if(!res.ok){
+            let message = `GitHub returned ${res.status}.`;
+
+            try {
+                const data = await res.json();
+                if(data.message) message = data.message;
+            } catch(e) {}
+
+            throw new Error(message);
+        }
+
+        const data = await res.json();
+
+        const cleanBase64 = data.content.replace(/\s/g, "");
+        const decoded = decodeURIComponent(
+            Array.from(atob(cleanBase64))
+                .map(char => "%" + char.charCodeAt(0).toString(16).padStart(2, "0"))
+                .join("")
+        );
+
+        const content = JSON.parse(decoded);
+
+        return {
+            content,
+            sha: data.sha
+        };
+    } catch(error) {
+        console.error(`Could not load ${path} from GitHub:`, error);
+        return null;
     }
 }
 
-document.getElementById("loginButton").addEventListener("click", checkPassword);
+/* ==========================================================
+   GITHUB API SAVE
+========================================================== */
+async function saveGitHubFileDirect(path, dataArray, useKeepalive = false){
+    const token = getGitHubToken();
 
-document.getElementById("passwordInput").addEventListener("keydown", event => {
-    if(event.key === "Enter") {
-        checkPassword();
-    }
-});
-
-async function loadData() {
-    const response = await fetch("/load-data");
-
-    if(!response.ok) {
-        throw new Error("Could not load saved data");
+    if(!token){
+        throw new Error("No GitHub token.");
     }
 
-    const data = await response.json();
-
-    if(!Array.isArray(data.hearts)) {
-        throw new Error("Invalid hearts data");
-    }
-
-    if(!Array.isArray(data.seen)) {
-        throw new Error("Invalid seen data");
-    }
-
-    heartedItems = new Set(data.hearts);
-    seenItems = new Set(data.seen);
-
-    saveLocalData();
-}
-
-async function saveData() {
-    const status = document.getElementById("status");
-
-    if(status) {
-        status.style.color = "#00AAFF";
-        status.textContent = "💾 Saving...";
-    }
+    const url =
+        `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
 
     try {
-        const heartsResponse = await fetch("/save-hearts", {
-            method: "POST",
+        const existing = await fetchGitHubFile(path);
+        const sha = existing ? existing.sha : undefined;
+
+        const json = JSON.stringify(dataArray, null, 2);
+
+        const contentBase64 = btoa(
+            unescape(
+                encodeURIComponent(json)
+            )
+        );
+
+        const body = {
+            message: `Update ${path} from Media Viewer`,
+            content: contentBase64,
+            branch: GITHUB_CONFIG.branch
+        };
+
+        if(sha){
+            body.sha = sha;
+        }
+
+        const options = {
+            method: "PUT",
             headers: {
+                "Authorization": `Bearer ${token}`,
+                "Accept": "application/vnd.github+json",
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify([...heartedItems])
-        });
+            body: JSON.stringify(body)
+        };
 
-        if(!heartsResponse.ok) {
-            throw new Error("Could not save hearts");
+        if(useKeepalive){
+            options.keepalive = true;
         }
 
-        const seenResponse = await fetch("/save-seen", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify([...seenItems])
-        });
+        const res = await fetch(url, options);
 
-        if(!seenResponse.ok) {
-            throw new Error("Could not save seen media");
+        if(!res.ok){
+            let message = `GitHub returned ${res.status}.`;
+
+            try {
+                const data = await res.json();
+                if(data.message) message = data.message;
+            } catch(e) {}
+
+            throw new Error(message);
         }
 
-        saveLocalData();
-
-        if(status) {
-            status.style.color = "#2ecc71";
-            status.textContent = "✅ Saved successfully";
-
-            setTimeout(() => {
-                if(status.textContent === "✅ Saved successfully") {
-                    status.textContent = "";
-                }
-            }, 2500);
-        }
-
+        console.log(`Successfully saved ${path} to GitHub.`);
         return true;
     } catch(error) {
-        console.error("Save failed:", error);
-
-        if(status) {
-            status.style.color = "#ff6666";
-            status.textContent = "❌ Save failed: " + error.message;
-        }
-
-        return false;
+        console.error(`Failed to save ${path}:`, error);
+        throw error;
     }
 }
 
-function saveLocalData() {
+/* ==========================================================
+   AUTOMATIC SYNC
+========================================================== */
+function triggerSync(){
     localStorage.setItem(
-        STORAGE.hearts,
+        STORAGE.heartsLocal,
         JSON.stringify([...heartedItems])
     );
 
     localStorage.setItem(
-        STORAGE.seen,
+        STORAGE.seenLocal,
         JSON.stringify([...seenItems])
     );
+
+    updateStatsDashboard();
+
+    if(syncTimeout){
+        clearTimeout(syncTimeout);
+    }
+
+    syncTimeout = setTimeout(async () => {
+        try {
+            if(heartsDirty){
+                await saveGitHubFileDirect(
+                    "saved_hearts.json",
+                    [...heartedItems]
+                );
+
+                heartsDirty = false;
+            }
+
+            if(seenDirty){
+                await saveGitHubFileDirect(
+                    "seen_media.json",
+                    [...seenItems]
+                );
+
+                seenDirty = false;
+            }
+        } catch(error) {
+            console.error("Automatic GitHub sync failed:", error);
+        }
+    }, 3000);
 }
 
-function loadLocalBackup() {
-    try {
-        const hearts = JSON.parse(
-            localStorage.getItem(STORAGE.hearts) || "[]"
-        );
+/* ==========================================================
+   FLUSH CHANGES
+========================================================== */
+function flushChanges(useKeepalive = false){
+    if(syncTimeout){
+        clearTimeout(syncTimeout);
+        syncTimeout = null;
+    }
 
-        const seen = JSON.parse(
-            localStorage.getItem(STORAGE.seen) || "[]"
-        );
+    localStorage.setItem(
+        STORAGE.heartsLocal,
+        JSON.stringify([...heartedItems])
+    );
 
-        if(Array.isArray(hearts)) {
-            heartedItems = new Set(hearts);
-        }
+    localStorage.setItem(
+        STORAGE.seenLocal,
+        JSON.stringify([...seenItems])
+    );
 
-        if(Array.isArray(seen)) {
-            seenItems = new Set(seen);
-        }
-    } catch(error) {
-        console.error("Could not load local backup:", error);
+    if(heartsDirty){
+        saveGitHubFileDirect(
+            "saved_hearts.json",
+            [...heartedItems],
+            useKeepalive
+        ).catch(error => {
+            console.error("Failed to flush hearts:", error);
+        });
+
+        heartsDirty = false;
+    }
+
+    if(seenDirty){
+        saveGitHubFileDirect(
+            "seen_media.json",
+            [...seenItems],
+            useKeepalive
+        ).catch(error => {
+            console.error("Failed to flush seen data:", error);
+        });
+
+        seenDirty = false;
     }
 }
 
-async function manualSave() {
-    await saveData();
+window.addEventListener("beforeunload", () => {
+    flushChanges(true);
+});
+
+document.addEventListener("visibilitychange", () => {
+    if(document.visibilityState === "hidden"){
+        flushChanges(true);
+    }
+});
+
+/* ==========================================================
+   MANUAL GITHUB BACKUP
+========================================================== */
+async function manualBackupToGitHub(){
+    const statusEl = document.getElementById("status");
+
+    if(statusEl){
+        statusEl.style.color = "#00AAFF";
+        statusEl.textContent = "⏳ Saving hearts and seen data to GitHub...";
+    }
+
+    localStorage.setItem(
+        STORAGE.heartsLocal,
+        JSON.stringify([...heartedItems])
+    );
+
+    localStorage.setItem(
+        STORAGE.seenLocal,
+        JSON.stringify([...seenItems])
+    );
+
+    try {
+        await saveGitHubFileDirect(
+            "saved_hearts.json",
+            [...heartedItems]
+        );
+
+        await saveGitHubFileDirect(
+            "seen_media.json",
+            [...seenItems]
+        );
+
+        heartsDirty = false;
+        seenDirty = false;
+
+        if(statusEl){
+            statusEl.style.color = "#2ecc71";
+            statusEl.textContent = "✅ Successfully saved to GitHub!";
+        }
+
+        setTimeout(() => {
+            if(statusEl){
+                statusEl.textContent = "";
+            }
+        }, 4000);
+    } catch(error) {
+        if(statusEl){
+            statusEl.style.color = "#ff6666";
+            statusEl.textContent = "❌ GitHub save failed: " + error.message;
+        }
+    }
 }
 
-function saveSettings() {
+/* ==========================================================
+   LOAD GITHUB DATA
+========================================================== */
+async function loadServerData(){
+    const heartsRes = await fetchGitHubFile("saved_hearts.json");
+
+    if(heartsRes && Array.isArray(heartsRes.content)){
+        heartedItems = new Set(heartsRes.content);
+    }
+
+    const seenRes = await fetchGitHubFile("seen_media.json");
+
+    if(seenRes && Array.isArray(seenRes.content)){
+        seenItems = new Set(seenRes.content);
+    }
+
+    localStorage.setItem(
+        STORAGE.heartsLocal,
+        JSON.stringify([...heartedItems])
+    );
+
+    localStorage.setItem(
+        STORAGE.seenLocal,
+        JSON.stringify([...seenItems])
+    );
+
+    updateStatsDashboard();
+}
+
+/* ==========================================================
+   SAVE FLAGS
+========================================================== */
+function saveHearts(){
+    heartsDirty = true;
+    triggerSync();
+}
+
+function saveSeen(){
+    seenDirty = true;
+    triggerSync();
+}
+
+function saveSettings(){
     localStorage.setItem(
         STORAGE.heartMode,
         heartMode.toString()
@@ -173,81 +444,94 @@ function saveSettings() {
     );
 }
 
-function updateStatsDashboard() {
+/* ==========================================================
+   STATS DASHBOARD
+========================================================== */
+function updateStatsDashboard(){
     const total = mediaUrls.length;
     const seen = seenItems.size;
     const hearts = heartedItems.size;
     const remaining = Math.max(0, total - seen);
-    const percentage = total > 0
-        ? Math.round((seen / total) * 100)
-        : 0;
+    const percentage =
+        total > 0 ? Math.round((seen / total) * 100) : 0;
 
-    const progress = document.getElementById("statProgress");
-    const seenElement = document.getElementById("statSeen");
-    const heartsElement = document.getElementById("statHearts");
-    const remainingElement = document.getElementById("statRemaining");
+    const progEl = document.getElementById("statProgress");
+    const seenEl = document.getElementById("statSeen");
+    const heartsEl = document.getElementById("statHearts");
+    const remEl = document.getElementById("statRemaining");
 
-    if(progress) {
-        progress.textContent = percentage + "%";
+    if(progEl){
+        progEl.textContent = percentage + "%";
     }
 
-    if(seenElement) {
-        seenElement.textContent = `${seen} / ${total}`;
+    if(seenEl){
+        seenEl.textContent = `${seen} / ${total}`;
     }
 
-    if(heartsElement) {
-        heartsElement.textContent = hearts;
+    if(heartsEl){
+        heartsEl.textContent = hearts;
     }
 
-    if(remainingElement) {
-        remainingElement.textContent = remaining;
+    if(remEl){
+        remEl.textContent = remaining;
     }
 }
 
-function showWelcome() {
-    if(localStorage.getItem(STORAGE.visited)) {
-        return;
+/* ==========================================================
+   WELCOME BANNER
+========================================================== */
+function showWelcome(){
+    const visited = localStorage.getItem(STORAGE.visited);
+
+    if(!visited){
+        const banner = document.getElementById("welcomeBanner");
+
+        if(banner){
+            banner.style.display = "block";
+
+            setTimeout(() => {
+                banner.style.display = "none";
+            }, 5000);
+        }
+
+        localStorage.setItem(STORAGE.visited, "true");
     }
-
-    const banner = document.getElementById("welcomeBanner");
-
-    if(banner) {
-        banner.style.display = "block";
-
-        setTimeout(() => {
-            banner.style.display = "none";
-        }, 5000);
-    }
-
-    localStorage.setItem(STORAGE.visited, "true");
 }
 
-function isImage(url) {
+/* ==========================================================
+   MEDIA DETECTION
+========================================================== */
+function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url)
         || url.includes("pbs.twimg.com")
         || url.includes("abs.twimg.com");
 }
 
-function isVideo(url) {
+function isVideo(url){
     return /\.(mp4|webm|mov|m4v)$/i.test(url)
         || url.includes("video.twimg.com");
 }
 
-function normalizeImageURL(url) {
+function normalizeImageURL(url){
     let src = url;
 
     if(
         src.includes("imgur.com/")
         && !src.includes("i.imgur.com")
-    ) {
-        src = src.replace("imgur.com/", "i.imgur.com/") + ".jpg";
+    ){
+        src = src.replace(
+            "imgur.com/",
+            "i.imgur.com/"
+        ) + ".jpg";
     }
 
     return src;
 }
 
-function createMediaElement(item) {
-    if(isVideo(item.url)) {
+function createMediaElement(item){
+    let element = null;
+
+    if(isVideo(item.url)){
         const video = document.createElement("video");
 
         video.src = item.url;
@@ -255,10 +539,8 @@ function createMediaElement(item) {
         video.playsInline = true;
         video.preload = "metadata";
 
-        return video;
-    }
-
-    if(isImage(item.url)) {
+        element = video;
+    } else if(isImage(item.url)){
         const img = document.createElement("img");
 
         img.src = normalizeImageURL(item.url);
@@ -269,33 +551,37 @@ function createMediaElement(item) {
             img.style.display = "none";
         };
 
-        return img;
+        element = img;
     }
 
-    return null;
+    return element;
 }
 
-function snapToTop() {
+/* ==========================================================
+   HELPERS
+========================================================== */
+function snapToTop(){
     window.scrollTo({
         top: 0,
         behavior: "instant"
     });
 }
 
-function shuffleArray(array) {
-    for(let i = array.length - 1; i > 0; i--) {
+function shuffleArray(array){
+    for(let i = array.length - 1; i > 0; i--){
         const j = Math.floor(Math.random() * (i + 1));
 
-        [array[i], array[j]] = [
-            array[j],
-            array[i]
-        ];
+        [array[i], array[j]] =
+            [array[j], array[i]];
     }
 
     return array;
 }
 
-function applySearch() {
+/* ==========================================================
+   SEARCH SYSTEM
+========================================================== */
+function applySearch(){
     workingList = buildDisplayList();
     currentIndex = 0;
 
@@ -303,65 +589,80 @@ function applySearch() {
     snapToTop();
 }
 
-function debouncedSearch() {
+function debouncedSearch(){
     clearTimeout(searchTimer);
+
     searchTimer = setTimeout(
         applySearch,
         SEARCH_DELAY
     );
 }
 
-const searchInput = document.getElementById("searchInput");
+const searchInput =
+    document.getElementById("searchInput");
 
-if(searchInput) {
+if(searchInput){
     searchInput.addEventListener(
         "input",
         debouncedSearch
     );
 }
 
-async function toggleHeart(index) {
-    if(heartedItems.has(index)) {
+/* ==========================================================
+   HEART SYSTEM
+========================================================== */
+function toggleHeart(index){
+    if(heartedItems.has(index)){
         heartedItems.delete(index);
     } else {
         heartedItems.add(index);
     }
 
-    saveLocalData();
-    updateStatsDashboard();
+    saveHearts();
 
-    document.querySelectorAll(".heart-btn").forEach(button => {
-        if(Number(button.dataset.index) !== index) {
-            return;
-        }
+    document.querySelectorAll(".heart-btn").forEach(btn => {
+        if(Number(btn.dataset.index) === index){
+            const active =
+                heartedItems.has(index);
 
-        const active = heartedItems.has(index);
+            btn.textContent =
+                active ? "❤️" : "♡";
 
-        button.textContent = active ? "❤️" : "♡";
-
-        if(active) {
-            button.classList.add("active");
-        } else {
-            button.classList.remove("active");
+            if(active){
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
         }
     });
 
-    if(heartMode && !heartedItems.has(index)) {
+    updateStatsDashboard();
+
+    if(
+        heartMode
+        && !heartedItems.has(index)
+    ){
         applySearch();
     }
 }
 
-function handleDoubleTap(itemIndex, wrapperElement) {
+function handleDoubleTap(
+    itemIndex,
+    wrapperElement
+){
     toggleHeart(itemIndex);
 
     const existingHeart =
-        wrapperElement.querySelector(".floating-heart");
+        wrapperElement.querySelector(
+            ".floating-heart"
+        );
 
-    if(existingHeart) {
+    if(existingHeart){
         existingHeart.remove();
     }
 
-    const heartPop = document.createElement("div");
+    const heartPop =
+        document.createElement("div");
 
     heartPop.className = "floating-heart";
     heartPop.textContent = "❤️";
@@ -373,12 +674,13 @@ function handleDoubleTap(itemIndex, wrapperElement) {
     }, 600);
 }
 
-function showHeartedOnly() {
+function showHeartedOnly(){
     heartMode = !heartMode;
 
     saveSettings();
 
     workingList = buildDisplayList();
+
     shuffleArray(workingList);
 
     currentIndex = 0;
@@ -387,7 +689,7 @@ function showHeartedOnly() {
     snapToTop();
 }
 
-function toggleSwipeMode() {
+function toggleSwipeMode(){
     swipeMode = !swipeMode;
 
     saveSettings();
@@ -398,79 +700,89 @@ function toggleSwipeMode() {
     snapToTop();
 }
 
-function addToHistory(item) {
-    recentHistory = recentHistory.filter(
-        historyItem => historyItem.index !== item.index
-    );
+/* ==========================================================
+   RECENTLY VIEWED HISTORY
+========================================================== */
+function addToHistory(item){
+    recentHistory =
+        recentHistory.filter(
+            i => i.index !== item.index
+        );
 
     recentHistory.unshift(item);
 
-    if(recentHistory.length > 20) {
+    if(recentHistory.length > 20){
         recentHistory.pop();
     }
 }
 
-function toggleHistoryModal() {
-    const modal = document.getElementById("historyModal");
+function toggleHistoryModal(){
+    const modal =
+        document.getElementById(
+            "historyModal"
+        );
 
-    if(!modal) {
-        return;
-    }
+    if(!modal) return;
 
     modal.classList.toggle("hidden");
 
-    if(!modal.classList.contains("hidden")) {
+    if(!modal.classList.contains("hidden")){
         renderHistoryList();
     }
 }
 
-function renderHistoryList() {
+function renderHistoryList(){
     const container =
-        document.getElementById("historyListContainer");
+        document.getElementById(
+            "historyListContainer"
+        );
 
-    if(!container) {
-        return;
-    }
+    if(!container) return;
 
-    if(recentHistory.length === 0) {
+    if(recentHistory.length === 0){
         container.innerHTML =
             '<p style="color:#777; text-align:center;">No recent history yet.</p>';
 
         return;
     }
 
-    container.innerHTML = recentHistory.map(item => `
-        <div class="history-item" onclick="jumpToHistoryItem(${item.index})">
-            <div style="font-size:16px; margin-right:10px;">
-                #${item.index}
-            </div>
+    container.innerHTML =
+        recentHistory.map(item => `
+            <div class="history-item"
+                 onclick="jumpToHistoryItem(${item.index})">
 
-            <div style="font-size:12px; color:#aaa; word-break:break-all; flex:1;">
-                ${item.url}
-            </div>
+                <div style="font-size:16px; margin-right:10px;">
+                    #${item.index}
+                </div>
 
-            <div style="font-size:16px; margin-left:10px;">
-                ${heartedItems.has(item.index) ? "❤️" : ""}
+                <div style="font-size:12px; color:#aaa; word-break:break-all; flex:1;">
+                    ${item.url}
+                </div>
+
+                <div style="font-size:16px; margin-left:10px;">
+                    ${heartedItems.has(item.index) ? "❤️" : ""}
+                </div>
             </div>
-        </div>
-    `).join("");
+        `).join("");
 }
 
-function jumpToHistoryItem(index) {
+function jumpToHistoryItem(index){
     toggleHistoryModal();
 
-    const foundIndex = workingList.findIndex(
-        item => item.index === index
-    );
-
-    if(foundIndex !== -1) {
-        currentIndex = foundIndex;
-    } else {
-        const item = mediaUrls.find(
-            media => media.index === index
+    const foundIndex =
+        workingList.findIndex(
+            item => item.index === index
         );
 
-        if(item) {
+    if(foundIndex !== -1){
+        currentIndex = foundIndex;
+    } else {
+        const item =
+            mediaUrls.find(
+                i => i.index === index
+            );
+
+        if(item){
             workingList.unshift(item);
             currentIndex = 0;
         }
@@ -480,12 +792,13 @@ function jumpToHistoryItem(index) {
     snapToTop();
 }
 
-async function clearAllData() {
-    const confirmed = confirm(
+/* ==========================================================
+   CLEAR DATA
+========================================================== */
+function clearHearts(){
+    if(!confirm(
         "Clear all hearts and seen media history?"
-    );
-
-    if(!confirmed) {
+    )){
         return;
     }
 
@@ -493,90 +806,68 @@ async function clearAllData() {
     seenItems.clear();
     recentHistory = [];
 
-    saveLocalData();
+    saveHearts();
+    saveSeen();
 
-    document.querySelectorAll(".heart-btn").forEach(button => {
-        button.textContent = "♡";
-        button.classList.remove("active");
-    });
+    document.querySelectorAll(".heart-btn")
+        .forEach(btn => {
+            btn.textContent = "♡";
+            btn.classList.remove("active");
+        });
 
-    updateStatsDashboard();
-
-    workingList = buildDisplayList();
-    currentIndex = 0;
-
-    render();
-
-    await saveData();
+    applySearch();
 }
 
-function buildDisplayList() {
+function clearAllData(){
+    clearHearts();
+}
+
+/* ==========================================================
+   BUILD DISPLAY LIST
+========================================================== */
+function buildDisplayList(){
     let list = [...mediaUrls];
 
     const queryElement =
-        document.getElementById("searchInput");
+        document.getElementById(
+            "searchInput"
+        );
 
-    const query = queryElement
-        ? queryElement.value.toLowerCase().trim()
-        : "";
+    const query =
+        queryElement
+            ? queryElement.value.toLowerCase().trim()
+            : "";
 
-    if(query) {
-        const number = query.replace("#", "");
+    if(query){
+        const number =
+            query.replace("#", "");
 
         list = list.filter(item =>
             item.url.toLowerCase().includes(query)
             || item.index.toString() === number
         );
-    } else if(heartMode) {
-        list = list.filter(item =>
-            heartedItems.has(item.index)
+    } else if(heartMode){
+        list = list.filter(
+            item => heartedItems.has(item.index)
         );
     } else {
-        list = list.filter(item =>
-            !seenItems.has(item.index)
+        list = list.filter(
+            item => !seenItems.has(item.index)
         );
     }
 
     return list;
 }
 
-function markSeen(index) {
-    if(heartMode) {
-        return;
-    }
-
-    if(seenItems.has(index)) {
-        return;
-    }
-
-    seenItems.add(index);
-
-    saveLocalData();
-    updateStatsDashboard();
-
-    const numberElement =
-        document.getElementById(`num-${index}`);
-
-    if(
-        numberElement
-        && !numberElement.querySelector(".seen-badge")
-    ) {
-        const badge = document.createElement("span");
-
-        badge.className = "seen-badge";
-        badge.style.marginLeft = "6px";
-        badge.textContent = "👀 Seen";
-
-        numberElement.appendChild(badge);
-    }
-}
-
-function setupObserver() {
-    if(observer) {
+/* ==========================================================
+   TRACK SEEN MEDIA
+========================================================== */
+function setupObserver(){
+    if(observer){
         observer.disconnect();
     }
 
-    if(observerTimeout) {
+    if(observerTimeout){
         clearTimeout(observerTimeout);
     }
 
@@ -584,16 +875,55 @@ function setupObserver() {
         observer = new IntersectionObserver(
             (entries, obs) => {
                 entries.forEach(entry => {
-                    if(!entry.isIntersecting) {
-                        return;
-                    }
+                    if(entry.isIntersecting){
+                        const index =
+                            Number(
+                                entry.target.dataset.index
+                            );
 
-                    const index =
-                        Number(entry.target.dataset.index);
+                        if(
+                            index
+                            && !heartMode
+                            && !seenItems.has(index)
+                        ){
+                            seenItems.add(index);
 
-                    if(index) {
-                        markSeen(index);
-                        obs.unobserve(entry.target);
+                            saveSeen();
+
+                            const numberEl =
+                                document.getElementById(
+                                    `num-${index}`
+                                );
+
+                            if(
+                                numberEl
+                                && !numberEl.querySelector(
+                                    ".seen-badge"
+                                )
+                            ){
+                                const badge =
+                                    document.createElement(
+                                        "span"
+                                    );
+
+                                badge.className =
+                                    "seen-badge";
+
+                                badge.style.marginLeft =
+                                    "6px";
+
+                                badge.textContent =
+                                    "👀 Seen";
+
+                                numberEl.appendChild(
+                                    badge
+                                );
+                            }
+
+                            obs.unobserve(
+                                entry.target
+                            );
+                        }
                     }
                 });
             },
@@ -603,88 +933,99 @@ function setupObserver() {
         );
 
         document
-            .querySelectorAll(".media-container")
+            .querySelectorAll(
+                ".media-container"
+            )
             .forEach(wrapper => {
                 observer.observe(wrapper);
             });
-    }, 500);
+    }, 1500);
 }
 
-function renderControls() {
-    const controls = `
+/* ==========================================================
+   RENDER CONTROLS
+========================================================== */
+function renderControls(){
+    const html = `
         <button
             class="random-btn"
-            onclick="nextRandomPage()"
-        >
+            onclick="nextRandomPage()">
             🎲 Random
         </button>
 
         <button
             class="heart-mode-btn"
-            onclick="showHeartedOnly()"
-        >
+            onclick="showHeartedOnly()">
             ${heartMode ? "❤️ Hearts" : "♡ Hearts"}
         </button>
 
         <button
             class="swipe-mode-btn"
             onclick="toggleSwipeMode()"
-            style="background:${swipeMode ? "#d35400" : "#2980b9"}"
-        >
+            style="background:${swipeMode ? "#d35400" : "#2980b9"}">
             ${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}
         </button>
 
         <button
             class="history-btn"
-            onclick="toggleHistoryModal()"
-        >
+            onclick="toggleHistoryModal()">
             🕒 History
         </button>
 
         <button
             class="backup-btn"
-            onclick="manualSave()"
-        >
-            💾 Save
+            onclick="manualBackupToGitHub()"
+            style="background:#27ae60; color:white;">
+            💾 Backup
         </button>
     `;
 
-    const topControls =
-        document.getElementById("topControls");
+    const topCtrl =
+        document.getElementById(
+            "topControls"
+        );
 
-    const bottomControls =
-        document.getElementById("bottomControls");
+    const botCtrl =
+        document.getElementById(
+            "bottomControls"
+        );
 
-    if(topControls) {
-        topControls.innerHTML = controls;
+    if(topCtrl){
+        topCtrl.innerHTML = html;
     }
 
-    if(bottomControls) {
-        bottomControls.innerHTML = controls;
+    if(botCtrl){
+        botCtrl.innerHTML = html;
     }
 }
 
-function render() {
+/* ==========================================================
+   RENDER SYSTEM
+========================================================== */
+function render(){
     renderControls();
     updateStatsDashboard();
 
     const container =
-        document.getElementById("mediaContainer");
+        document.getElementById(
+            "mediaContainer"
+        );
 
-    const status =
-        document.getElementById("status");
+    const statusEl =
+        document.getElementById(
+            "status"
+        );
 
-    if(!container) {
-        return;
-    }
+    if(!container) return;
 
     container.innerHTML = "";
 
-    if(status) {
-        status.textContent = "";
+    if(statusEl){
+        statusEl.textContent = "";
     }
 
-    const pageSize = swipeMode ? 1 : 15;
+    const pageSize =
+        swipeMode ? 1 : 15;
 
     let shown = 0;
     let lastTapTime = 0;
@@ -692,8 +1033,9 @@ function render() {
     while(
         shown < pageSize
         && currentIndex < workingList.length
-    ) {
-        const item = workingList[currentIndex];
+    ){
+        const item =
+            workingList[currentIndex];
 
         currentIndex++;
 
@@ -702,20 +1044,28 @@ function render() {
         const wrapper =
             document.createElement("div");
 
-        wrapper.className = "media-container";
-        wrapper.dataset.index = item.index;
+        wrapper.className =
+            "media-container";
+
+        wrapper.dataset.index =
+            item.index;
 
         const number =
             document.createElement("div");
 
-        number.className = "media-number";
-        number.id = `num-${item.index}`;
-        number.textContent = "#" + item.index;
+        number.className =
+            "media-number";
+
+        number.id =
+            `num-${item.index}`;
+
+        number.textContent =
+            "#" + item.index;
 
         if(
             !heartMode
             && seenItems.has(item.index)
-        ) {
+        ){
             number.innerHTML +=
                 ' <span class="seen-badge" style="margin-left:6px;">👀 Seen</span>';
         }
@@ -725,8 +1075,11 @@ function render() {
         const heart =
             document.createElement("button");
 
-        heart.className = "heart-btn";
-        heart.dataset.index = item.index;
+        heart.className =
+            "heart-btn";
+
+        heart.dataset.index =
+            item.index;
 
         const isHearted =
             heartedItems.has(item.index);
@@ -734,57 +1087,68 @@ function render() {
         heart.textContent =
             isHearted ? "❤️" : "♡";
 
-        if(isHearted) {
+        if(isHearted){
             heart.classList.add("active");
         }
 
-        heart.onclick = () =>
-            toggleHeart(item.index);
+        heart.onclick =
+            () => toggleHeart(item.index);
 
         wrapper.appendChild(heart);
 
         const link =
             document.createElement("a");
 
-        link.href = item.url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = item.url;
+        link.href =
+            item.url;
+
+        link.target =
+            "_blank";
+
+        link.textContent =
+            item.url;
 
         wrapper.appendChild(link);
 
         const media =
             createMediaElement(item);
 
-        if(media) {
-            media.addEventListener("click", event => {
-                const currentTime =
-                    Date.now();
+        if(media){
+            media.addEventListener(
+                "click",
+                e => {
+                    const currentTime =
+                        new Date().getTime();
 
-                const tapLength =
-                    currentTime - lastTapTime;
+                    const tapLength =
+                        currentTime -
+                        lastTapTime;
 
-                if(
-                    tapLength < 300
-                    && tapLength > 0
-                ) {
-                    event.preventDefault();
+                    if(
+                        tapLength < 300
+                        && tapLength > 0
+                    ){
+                        e.preventDefault();
 
-                    handleDoubleTap(
-                        item.index,
-                        wrapper
-                    );
+                        handleDoubleTap(
+                            item.index,
+                            wrapper
+                        );
+                    }
+
+                    lastTapTime =
+                        currentTime;
                 }
-
-                lastTapTime = currentTime;
-            });
+            );
 
             wrapper.appendChild(media);
         }
 
-        if(swipeMode) {
+        if(swipeMode){
             const swipeActions =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             swipeActions.className =
                 "swipe-actions";
@@ -793,25 +1157,31 @@ function render() {
                 <button
                     class="swipe-action-btn"
                     style="background:#7f8c8d;"
-                    onclick="nextRandomPage()"
-                >
+                    onclick="nextRandomPage()">
                     ⏭️ Skip
                 </button>
 
                 <button
                     class="swipe-action-btn"
                     style="background:#e91e63;"
-                    onclick="toggleHeart(${item.index})"
-                >
+                    onclick="toggleHeart(${item.index})">
                     ${heartedItems.has(item.index)
                         ? "❤️ Unheart"
                         : "❤️ Heart"}
                 </button>
             `;
 
-            wrapper.appendChild(swipeActions);
+            wrapper.appendChild(
+                swipeActions
+            );
 
-            markSeen(item.index);
+            if(
+                !heartMode
+                && !seenItems.has(item.index)
+            ){
+                seenItems.add(item.index);
+                saveSeen();
+            }
         }
 
         container.appendChild(wrapper);
@@ -819,45 +1189,62 @@ function render() {
         shown++;
     }
 
-    if(!swipeMode) {
+    if(!swipeMode){
         setupObserver();
     }
 }
 
-function nextRandomPage() {
+/* ==========================================================
+   RANDOM PAGE SYSTEM
+========================================================== */
+function nextRandomPage(){
     snapToTop();
 
-    const status =
-        document.getElementById("status");
+    const statusEl =
+        document.getElementById(
+            "status"
+        );
 
-    if(heartMode) {
-        if(currentIndex >= workingList.length) {
-            shuffleArray(workingList);
+    if(heartMode){
+        if(
+            currentIndex >=
+            workingList.length
+        ){
+            shuffleArray(
+                workingList
+            );
+
             currentIndex = 0;
 
-            if(status) {
-                status.textContent =
+            if(statusEl){
+                statusEl.textContent =
                     "❤️ All hearts viewed! Reshuffling hearts.";
             }
         }
     } else {
-        workingList = buildDisplayList();
+        workingList =
+            buildDisplayList();
 
-        shuffleArray(workingList);
+        shuffleArray(
+            workingList
+        );
 
         currentIndex = 0;
 
-        if(workingList.length === 0) {
+        if(workingList.length === 0){
             seenItems.clear();
 
-            saveLocalData();
+            saveSeen();
 
-            workingList = buildDisplayList();
+            workingList =
+                buildDisplayList();
 
-            shuffleArray(workingList);
+            shuffleArray(
+                workingList
+            );
 
-            if(status) {
-                status.textContent =
+            if(statusEl){
+                statusEl.textContent =
                     "🎉 Cycle complete. Starting again.";
             }
         }
@@ -866,14 +1253,18 @@ function nextRandomPage() {
     render();
 }
 
-async function initializeApp() {
+/* ==========================================================
+   START APPLICATION
+========================================================== */
+async function initializeApp(){
     try {
         const response =
             await fetch(
-                "mediaNEW.json?t=" + Date.now()
+                "mediaNEW.json?t=" +
+                new Date().getTime()
             );
 
-        if(!response.ok) {
+        if(!response.ok){
             throw new Error(
                 "Could not load mediaNEW.json"
             );
@@ -882,54 +1273,41 @@ async function initializeApp() {
         const data =
             await response.json();
 
-        if(!Array.isArray(data)) {
-            throw new Error(
-                "mediaNEW.json must contain an array"
-            );
-        }
-
-        mediaUrls = data.map((url, index) => ({
-            url: url,
-            index: index + 1
-        }));
-
-        try {
-            await loadData();
-        } catch(error) {
-            console.error(
-                "Server data could not be loaded:",
-                error
+        mediaUrls =
+            data.map(
+                (url, index) => ({
+                    url: url,
+                    index: index + 1
+                })
             );
 
-            loadLocalBackup();
-
-            const status =
-                document.getElementById("status");
-
-            if(status) {
-                status.textContent =
-                    "⚠️ Could not load server data. Using local backup.";
-            }
-        }
+        await loadServerData();
 
         showWelcome();
 
-        workingList = buildDisplayList();
+        workingList =
+            buildDisplayList();
 
-        shuffleArray(workingList);
+        shuffleArray(
+            workingList
+        );
 
         currentIndex = 0;
 
         render();
     } catch(error) {
-        console.error(error);
+        const statusEl =
+            document.getElementById(
+                "status"
+            );
 
-        const status =
-            document.getElementById("status");
+        if(statusEl){
+            statusEl.style.color =
+                "#ff6666";
 
-        if(status) {
-            status.textContent =
-                "Error: " + error.message;
+            statusEl.textContent =
+                "Error: " +
+                error.message;
         }
     }
 }
