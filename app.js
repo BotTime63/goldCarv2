@@ -1,5 +1,5 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.5 (Normal Scroll + Preload)
+   APP.JS - Media Viewer V4.5 (Vertical Scroll + Preload)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -303,22 +303,10 @@ function toggleHeart(index){
         }
     });
 
-    document.querySelectorAll(".swipe-action-btn").forEach(btn => {
-        if(btn.dataset.index == index) {
-            btn.textContent = heartedItems.has(index) ? "❤️ Unheart" : "❤️ Heart";
-        }
-    });
-
     updateStatsDashboard();
 
     if(heartMode && !heartedItems.has(index)){
         applySearch();
-    }
-
-    if(swipeMode && heartedItems.has(index)){
-        setTimeout(() => {
-            nextRandomPage();
-        }, 350);
     }
 }
 
@@ -539,7 +527,6 @@ function renderControls(){
     const html = `
         <div style="display:flex; justify-content:center; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
             <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
-            <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
             <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
             <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
         </div>
@@ -571,7 +558,7 @@ function render(){
     const statusEl = document.getElementById("status");
     if(statusEl) statusEl.textContent = "";
 
-    const pageSize = swipeMode ? 1 : 15;
+    const pageSize = 15;
     let shown = 0;
     let lastTapTime = 0;
 
@@ -627,44 +614,6 @@ function render(){
             wrapper.appendChild(media);
         }
 
-        if(swipeMode){
-            const swipeActions = document.createElement("div");
-            swipeActions.className = "swipe-actions";
-            swipeActions.innerHTML = `
-                <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
-                <button class="swipe-action-btn" data-index="${item.index}" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
-            `;
-            wrapper.appendChild(swipeActions);
-
-            if(!heartMode && !seenItems.has(item.index)){
-                seenItems.add(item.index);
-                updateStatsDashboard();
-            }
-
-            let touchStartX = 0;
-            let touchEndX = 0;
-
-            wrapper.addEventListener("touchstart", (e) => {
-                if(e.touches.length === 1) {
-                    touchStartX = e.changedTouches[0].screenX;
-                }
-            }, {passive: true});
-
-            wrapper.addEventListener("touchend", (e) => {
-                if(e.changedTouches.length === 1) {
-                    touchEndX = e.changedTouches[0].screenX;
-                    const diff = touchEndX - touchStartX;
-                    if (Math.abs(diff) > 70) {
-                        if (diff < 0) {
-                            nextRandomPage();
-                        } else {
-                            toggleHeart(item.index);
-                        }
-                    }
-                }
-            }, {passive: true});
-        }
-
         container.appendChild(wrapper);
         shown++;
     }
@@ -672,9 +621,7 @@ function render(){
     // Trigger background preloading for subsequent items
     preloadNextItems();
 
-    if(!swipeMode){
-        setupObserver();
-    }
+    setupObserver();
 }
 
 /* ==========================================================
