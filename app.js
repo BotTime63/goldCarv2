@@ -1,10 +1,10 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.3 Logic
+   APP.JS - Media Viewer V4.3 Logic (Fixed GitHub Sync & Clear)
 ========================================================== */
 
 const GITHUB_CONFIG = {
     owner: "bottime63",
-    repo: "goldCarv2", // Updated to match your repo goldCarv2
+    repo: "goldCarv2",
     token: localStorage.getItem("mediaViewerToken") || "",
     branch: "main"
 };
@@ -100,7 +100,9 @@ async function saveGitHubFile(path, dataArray) {
     const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
     const existing = await fetchGitHubFile(path);
     const sha = existing ? existing.sha : undefined;
-    const contentBase64 = btoa(JSON.stringify(dataArray, null, 2));
+    
+    const jsonString = JSON.stringify(dataArray, null, 2);
+    const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
 
     const body = {
         message: `Update ${path} from Mobile Viewer`,
@@ -117,7 +119,11 @@ async function saveGitHubFile(path, dataArray) {
         },
         body: JSON.stringify(body)
     });
-    if(!res.ok) throw new Error(`Failed to commit ${path}`);
+    
+    if(!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Failed to commit ${path}`);
+    }
 }
 
 async function loadServerData(){
@@ -297,7 +303,6 @@ function toggleHeart(index){
         applySearch();
     }
 
-    // In swipe mode, if heart is added, auto go to the next item immediately
     if(swipeMode && heartedItems.has(index)){
         setTimeout(() => {
             nextRandomPage();
@@ -422,8 +427,8 @@ function jumpToHistoryItem(index){
     snapToTop();
 }
 
-function clearAllData(){
-    if(!confirm("Clear all hearts and seen media history? (Don't forget to click Save to GitHub afterwards to commit changes!)")) return;
+async function clearAllData(){
+    if(!confirm("Clear all hearts and seen media history locally and on GitHub?")) return;
 
     heartedItems.clear();
     seenItems.clear();
@@ -435,6 +440,27 @@ function clearAllData(){
     });
 
     applySearch();
+
+    const statusEl = document.getElementById("status");
+    if(statusEl) {
+        statusEl.style.color = "#00AAFF";
+        statusEl.textContent = "🗑 Clearing data on GitHub...";
+    }
+
+    try {
+        await saveGitHubFile("saved_hearts.json", []);
+        await saveGitHubFile("seen_media.json", []);
+        if(statusEl) {
+            statusEl.style.color = "#2ecc71";
+            statusEl.textContent = "✅ Successfully cleared and saved to GitHub!";
+            setTimeout(() => { statusEl.textContent = ""; }, 4000);
+        }
+    } catch(error) {
+        if(statusEl) {
+            statusEl.style.color = "#ff6666";
+            statusEl.textContent = "❌ Failed to clear on GitHub: " + error.message;
+        }
+    }
 }
 
 /* ==========================================================
@@ -495,7 +521,7 @@ function setupObserver(){
 }
 
 /* ==========================================================
-   RENDER SYSTEM (Layout order: History, Swipe, Hearts, Random)
+   RENDER SYSTEM
 ========================================================== */
 function renderControls(){
     const html = `
