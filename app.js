@@ -1,5 +1,5 @@
 /* ==========================================================
-    APP.JS - Media Viewer V4.6 (Swipe Mode + Auto-Next Heart)
+   APP.JS - Media Viewer V4.6 (Swipe Mode + Auto-Next Heart)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -36,7 +36,7 @@ let autoPlayTimer = null;
 let autoPlayInterval = 5000;
 
 /* ==========================================================
-    AUTHENTICATION & INITIALIZATION
+   AUTHENTICATION & INITIALIZATION
 ========================================================== */
 function checkPassword(){
     const tokenInput = document.getElementById("passwordInput").value.trim();
@@ -78,13 +78,13 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==========================================================
-    GITHUB API SAVE & LOAD FUNCTIONS
+   GITHUB API SAVE & LOAD FUNCTIONS
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
         const res = await fetch(url, {
-            headers: { Authorization: `token ${GITHUB_CONFIG.token}` }
+            headers: { Authorization: `Bearer ${GITHUB_CONFIG.token}` }
         });
         if(!res.ok) return null;
         const data = await res.json();
@@ -114,7 +114,7 @@ async function saveGitHubFile(path, dataArray) {
     const res = await fetch(url, {
         method: "PUT",
         headers: {
-            "Authorization": `token ${GITHUB_CONFIG.token}`,
+            "Authorization": `Bearer ${GITHUB_CONFIG.token}`,
             "Content-Type": "application/json"
         },
         body: JSON.stringify(body)
@@ -163,7 +163,7 @@ function saveSettings(){
 }
 
 /* ==========================================================
-    STATS DASHBOARD
+   STATS DASHBOARD
 ========================================================== */
 function updateStatsDashboard(){
     const total = mediaUrls.length;
@@ -184,7 +184,7 @@ function updateStatsDashboard(){
 }
 
 /* ==========================================================
-    WELCOME BANNER
+   WELCOME BANNER
 ========================================================== */
 function showWelcome(){
     const visited = localStorage.getItem(STORAGE.visited);
@@ -199,7 +199,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-    MEDIA DETECTION & PRELOADING
+   MEDIA DETECTION & PRELOADING
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
@@ -249,7 +249,7 @@ function createMediaElement(item){
 }
 
 /* ==========================================================
-    HELPERS
+   HELPERS
 ========================================================== */
 function snapToTop(){
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -264,7 +264,7 @@ function shuffleArray(array){
 }
 
 /* ==========================================================
-    SEARCH SYSTEM
+   SEARCH SYSTEM
 ========================================================== */
 function applySearch(){
     workingList = buildDisplayList();
@@ -284,7 +284,7 @@ if(searchInputEl) {
 }
 
 /* ==========================================================
-    HEART SYSTEM & DOUBLE TAP WITH AUTO-NEXT IN SWIPE MODE
+   HEART SYSTEM & DOUBLE TAP WITH AUTO-NEXT IN SWIPE MODE
 ========================================================== */
 function toggleHeart(index){
     const wasHearted = heartedItems.has(index);
@@ -355,7 +355,7 @@ function toggleSwipeMode(){
 }
 
 /* ==========================================================
-    AUTO PLAY SYSTEM
+   AUTO PLAY SYSTEM
 ========================================================== */
 function toggleAutoPlay(){
     autoPlayActive = !autoPlayActive;
@@ -387,7 +387,7 @@ function changeAutoPlaySpeed(val){
 }
 
 /* ==========================================================
-    RECENTLY VIEWED HISTORY DRAWER
+   RECENTLY VIEWED HISTORY DRAWER
 ========================================================== */
 function addToHistory(item){
     recentHistory = recentHistory.filter(i => i.index !== item.index);
@@ -476,7 +476,7 @@ async function clearAllData(){
 }
 
 /* ==========================================================
-    BUILD DISPLAY LIST
+   BUILD DISPLAY LIST
 ========================================================== */
 function buildDisplayList(){
     let list = [...mediaUrls];
@@ -496,7 +496,7 @@ function buildDisplayList(){
 }
 
 /* ==========================================================
-    TRACK SEEN MEDIA WITH INTERSECTION
+   TRACK SEEN MEDIA WITH INTERSECTION
 ========================================================== */
 function setupObserver(){
     if(observer) observer.disconnect();
@@ -533,7 +533,7 @@ function setupObserver(){
 }
 
 /* ==========================================================
-    RENDER SYSTEM
+   RENDER SYSTEM
 ========================================================== */
 function renderControls(){
     const html = `
@@ -579,7 +579,6 @@ function render(){
 
     const pageSize = swipeMode ? 1 : 15;
     let shown = 0;
-    let lastTapTime = 0;
 
     while(shown < pageSize && currentIndex < workingList.length){
         const item = workingList[currentIndex];
@@ -621,14 +620,9 @@ function render(){
 
         const media = createMediaElement(item);
         if(media) {
-            media.addEventListener("click", (e) => {
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTapTime;
-                if (tapLength < 300 && tapLength > 0) {
-                    e.preventDefault();
-                    handleDoubleTap(item.index, wrapper);
-                }
-                lastTapTime = currentTime;
+            media.addEventListener("dblclick", (e) => {
+                e.preventDefault();
+                handleDoubleTap(item.index, wrapper);
             });
             wrapper.appendChild(media);
         }
@@ -642,7 +636,7 @@ function render(){
 }
 
 /* ==========================================================
-    RANDOM PAGE SYSTEM
+   RANDOM PAGE SYSTEM
 ========================================================== */
 function nextRandomPage(){
     snapToTop();
@@ -672,7 +666,7 @@ function nextRandomPage(){
 }
 
 /* ==========================================================
-    START APPLICATION
+   START APPLICATION
 ========================================================== */
 async function initializeApp(){
     try {
@@ -692,6 +686,6 @@ async function initializeApp(){
         render();
     } catch(error) {
         const statusEl = document.getElementById("status");
-        if(statusEl) statusEl.textContent = "Error: " + error.message;
+        if(statusEl) statusEl.textContent = "❌ Error loading media list: " + error.message;
     }
 }
