@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 
 <!-- PWA / iOS App Mode Meta Tags -->
@@ -11,9 +11,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
 
-<title>Media Viewer V4.3 - GitHub Sync</title>
+<title>Media Viewer V4.4 - Mobile UI</title>
 
 <style>
+/* ==========================================================
+   GLOBAL
+========================================================== */
+
 * {
     box-sizing: border-box;
 }
@@ -21,6 +25,7 @@
 html {
     scroll-behavior: smooth;
     overscroll-behavior-y: none;
+    background: #000;
 }
 
 body {
@@ -32,7 +37,14 @@ body {
     font-family: Arial, Helvetica, sans-serif;
     text-align: center;
     user-select: none;
-    -webkit-touch-callout: default; /* Allows iOS long-press menu to save media */
+    -webkit-touch-callout: default;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* iPhone safe-area support */
+#app {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 h1 {
@@ -45,16 +57,22 @@ a {
     color: #00AAFF;
 }
 
-img, video {
+img,
+video {
     user-select: auto;
 }
 
-/* Media */
+
+/* ==========================================================
+   MEDIA
+========================================================== */
+
 .media-container {
     width: 100vw;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-start;
     margin: 0;
     padding: 0 0 15px;
     position: relative;
@@ -70,10 +88,130 @@ img, video {
     object-fit: contain;
     background: #000;
     display: block;
-    touch-action: pan-x pan-y pinch-zoom; /* Enables smooth pinch-to-zoom */
+    touch-action: pan-x pan-y pinch-zoom;
     cursor: pointer;
-    -webkit-touch-callout: default !important; /* Ensures iOS long press works on media */
+    -webkit-touch-callout: default !important;
 }
+
+/* ==========================================================
+   SWIPE MODE MEDIA
+========================================================== */
+
+body.swipe-mode {
+    overflow: hidden;
+}
+
+body.swipe-mode #app {
+    min-height: 100svh;
+    height: 100svh;
+    display: flex !important;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+body.swipe-mode h1 {
+    margin: 6px 0 3px;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+body.swipe-mode #searchInput,
+body.swipe-mode #statsDashboard,
+body.swipe-mode #topControls,
+body.swipe-mode #bottomControls {
+    flex-shrink: 0;
+}
+
+body.swipe-mode #searchInput {
+    margin: 3px auto 5px;
+}
+
+body.swipe-mode #statsDashboard {
+    margin-bottom: 5px;
+}
+
+body.swipe-mode #status {
+    flex-shrink: 0;
+    margin: 3px 10px;
+    min-height: 18px;
+}
+
+body.swipe-mode #mediaContainer {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/*
+   Swipe Mode wrapper fills the available screen.
+   Media itself stays proportional and centered.
+*/
+body.swipe-mode .media-container {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+body.swipe-mode .media-container img,
+body.swipe-mode .media-container video {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+/* Hide URL in Swipe Mode to give media more room */
+body.swipe-mode .media-container > a {
+    display: none;
+}
+
+body.swipe-mode .media-number {
+    position: absolute;
+    top: 5px;
+    left: 10px;
+    right: 10px;
+    z-index: 5;
+    margin: 0;
+    font-size: 11px;
+    pointer-events: none;
+}
+
+/* Heart in Swipe Mode */
+body.swipe-mode .heart-btn {
+    position: absolute;
+    top: 32px;
+    right: 15px;
+    z-index: 10;
+    margin: 0;
+    font-size: 34px;
+    padding: 4px 8px;
+}
+
+/* Swipe action buttons */
+body.swipe-mode .swipe-actions {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 8px;
+    z-index: 10;
+    margin: 0;
+    justify-content: center;
+}
+
+
+/* ==========================================================
+   MEDIA NUMBER
+========================================================== */
 
 .media-number {
     margin: 6px 0 4px;
@@ -89,7 +227,11 @@ img, video {
     text-decoration: none;
 }
 
-/* Heart */
+
+/* ==========================================================
+   HEART
+========================================================== */
+
 .heart-btn {
     border: none;
     background: transparent;
@@ -109,7 +251,11 @@ img, video {
     color: #ff2d55;
 }
 
-/* Floating Double-Tap Heart Animation */
+
+/* ==========================================================
+   FLOATING DOUBLE-TAP HEART
+========================================================== */
+
 .floating-heart {
     position: absolute;
     top: 50%;
@@ -124,13 +270,32 @@ img, video {
 }
 
 @keyframes popHeart {
-    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-    30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-    60% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+
+    30% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+    }
+
+    60% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1.4);
+        opacity: 0;
+    }
 }
 
-/* Search */
+
+/* ==========================================================
+   SEARCH
+========================================================== */
+
 #searchInput {
     width: 90%;
     max-width: 450px;
@@ -142,7 +307,11 @@ img, video {
     outline: none;
 }
 
-/* Stats Dashboard */
+
+/* ==========================================================
+   STATS DASHBOARD
+========================================================== */
+
 .stats-dashboard {
     display: flex;
     justify-content: space-around;
@@ -176,7 +345,11 @@ img, video {
     color: #fff;
 }
 
-/* Buttons */
+
+/* ==========================================================
+   GENERAL BUTTONS
+========================================================== */
+
 button {
     padding: 9px 14px;
     margin: 3px;
@@ -186,59 +359,301 @@ button {
     cursor: pointer;
     color: #fff;
     background: #4CAF50;
-    transition: background .15s ease;
+    transition:
+        background .15s ease,
+        transform .1s ease,
+        opacity .15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button:active {
+    transform: scale(.96);
 }
 
 button:hover {
     background: #45A049;
 }
 
-.random-btn { background: #8e44ad; }
-.heart-mode-btn { background: #e91e63; }
-.swipe-mode-btn { background: #2980b9; }
-.history-btn { background: #34495e; }
-.sync-btn { background: #27ae60; font-weight: bold; }
-.autoplay-btn { background: #16a085; font-weight: bold; }
+.random-btn {
+    background: #8e44ad;
+}
 
-/* Swipe Mode Action Bar */
+.random-btn:hover {
+    background: #9b59b6;
+}
+
+.heart-mode-btn {
+    background: #e91e63;
+}
+
+.swipe-mode-btn {
+    background: #2980b9;
+}
+
+.history-btn {
+    background: #34495e;
+}
+
+.sync-btn {
+    background: #27ae60;
+    font-weight: bold;
+}
+
+.autoplay-btn {
+    background: #16a085;
+    font-weight: bold;
+}
+
+
+/* ==========================================================
+   MOBILE PRIMARY CONTROLS
+========================================================== */
+
+/*
+   Main control layout:
+   LEFT = secondary controls
+   RIGHT = large Random button
+
+   Designed around right-thumb usage on iPhone.
+*/
+
+.mobile-control-layout {
+    width: 95%;
+    max-width: 520px;
+    margin: 0 auto 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.control-left {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    gap: 4px;
+}
+
+.control-left button {
+    margin: 2px;
+}
+
+.random-control {
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.random-btn {
+    width: 100%;
+    min-height: 86px;
+    margin: 0;
+    font-size: 21px;
+    font-weight: bold;
+    border-radius: 14px;
+    box-shadow: 0 3px 12px rgba(142, 68, 173, .35);
+}
+
+.random-btn:active {
+    transform: scale(.97);
+}
+
+
+/* ==========================================================
+   SECONDARY CONTROLS
+========================================================== */
+
+.secondary-controls {
+    width: 95%;
+    max-width: 520px;
+    margin: 0 auto 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.secondary-controls button {
+    flex: 1 1 auto;
+    min-width: 105px;
+}
+
+.secondary-controls select {
+    padding: 8px 9px;
+    border-radius: 7px;
+    background: #222;
+    color: #fff;
+    border: 1px solid #444;
+    font-size: 12px;
+}
+
+
+/* ==========================================================
+   SWIPE MODE ACTION BAR
+========================================================== */
+
 .swipe-actions {
     display: flex;
     justify-content: center;
     gap: 10px;
     margin: 10px 0 20px;
 }
+
 .swipe-action-btn {
     padding: 12px 20px;
     font-size: 14px;
     font-weight: bold;
     border-radius: 8px;
+    min-width: 120px;
 }
 
-/* History Modal */
+
+/* ==========================================================
+   SEEN BADGE
+========================================================== */
+
+.seen-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(46, 204, 113, .16);
+    border: 1px solid rgba(46, 204, 113, .45);
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: bold;
+    opacity: 1;
+    vertical-align: middle;
+}
+
+
+/* ==========================================================
+   HISTORY MODAL
+========================================================== */
+
 #historyModal {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.92);
+    background: rgba(0, 0, 0, 0.94);
     z-index: 9500;
-    padding: 20px;
+    padding:
+        calc(15px + env(safe-area-inset-top))
+        12px
+        calc(20px + env(safe-area-inset-bottom));
     overflow-y: auto;
     text-align: left;
 }
+
+.history-modal-inner {
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+    gap: 10px;
+}
+
+.history-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.history-close-btn {
+    background: #c0392b;
+    padding: 7px 12px;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+
+/* Individual History Item */
+
 .history-item {
     display: flex;
     align-items: center;
     background: #151515;
-    padding: 10px;
+    padding: 8px;
     margin-bottom: 8px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid #222;
     cursor: pointer;
+    min-height: 70px;
+    transition:
+        background .15s ease,
+        transform .1s ease;
 }
+
 .history-item:hover {
     background: #222;
 }
 
-/* Safe Footer Clear Button */
+.history-item:active {
+    transform: scale(.985);
+}
+
+.history-thumbnail {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    border-radius: 7px;
+    object-fit: cover;
+    background: #000;
+    border: 1px solid #333;
+}
+
+.history-thumbnail-placeholder {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    border-radius: 7px;
+    background: #0c0c0c;
+    border: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #666;
+}
+
+.history-info {
+    min-width: 0;
+    flex: 1;
+    margin-left: 10px;
+}
+
+.history-number {
+    font-size: 13px;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 3px;
+}
+
+.history-url {
+    font-size: 10px;
+    color: #777;
+    word-break: break-all;
+    line-height: 1.3;
+}
+
+.history-heart {
+    font-size: 18px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+
+/* ==========================================================
+   SAFE FOOTER
+========================================================== */
+
 .footer-container {
     margin: 40px 0 60px;
     padding-top: 20px;
@@ -273,33 +688,52 @@ button:hover {
     padding: 6px 12px;
     border-radius: 6px;
 }
+
 .logout-btn:hover {
     color: #fff;
     border-color: #888;
     background: rgba(255, 255, 255, 0.05);
 }
 
-/* Controls */
+
+/* ==========================================================
+   CONTROLS
+========================================================== */
+
 .controls {
     width: 100%;
     text-align: center;
 }
 
-#topControls { margin-top: 5px; }
-#bottomControls { padding-bottom: 10px; }
+#topControls {
+    margin-top: 5px;
+}
 
-/* Status */
+#bottomControls {
+    padding-bottom: 10px;
+}
+
+
+/* ==========================================================
+   STATUS
+========================================================== */
+
 #status {
     color: #ff6666;
     font-size: 14px;
     margin: 10px;
     min-height: 20px;
+    transition: color .2s ease;
 }
 
-/* Welcome */
+
+/* ==========================================================
+   WELCOME
+========================================================== */
+
 #welcomeBanner {
     position: fixed;
-    top: 20px;
+    top: calc(20px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -313,7 +747,11 @@ button:hover {
     z-index: 9000;
 }
 
-/* Login */
+
+/* ==========================================================
+   LOGIN
+========================================================== */
+
 #loginScreen {
     position: fixed;
     inset: 0;
@@ -341,8 +779,74 @@ button:hover {
     outline: none;
 }
 
-#app { display: none; }
-.hidden { display: none !important; }
+#app {
+    display: none;
+}
+
+.hidden {
+    display: none !important;
+}
+
+
+/* ==========================================================
+   SMALL PHONE OPTIMIZATION
+========================================================== */
+
+@media (max-width: 380px) {
+
+    h1 {
+        font-size: 22px;
+    }
+
+    .mobile-control-layout {
+        gap: 5px;
+    }
+
+    .random-btn {
+        min-height: 78px;
+        font-size: 18px;
+    }
+
+    .control-left button {
+        font-size: 11px;
+        padding: 8px 9px;
+    }
+
+    .stats-dashboard {
+        width: 96%;
+    }
+
+    .stat-label {
+        font-size: 9px;
+    }
+
+    .stat-value {
+        font-size: 12px;
+    }
+}
+
+
+/* ==========================================================
+   DESKTOP / LARGER SCREEN
+========================================================== */
+
+@media (min-width: 700px) {
+
+    .mobile-control-layout {
+        max-width: 650px;
+    }
+
+    .random-btn {
+        min-height: 95px;
+    }
+
+    .history-thumbnail,
+    .history-thumbnail-placeholder {
+        width: 76px;
+        height: 76px;
+        flex-basis: 76px;
+    }
+}
 </style>
 </head>
 
@@ -354,64 +858,185 @@ button:hover {
     on this device.
 </div>
 
-<!-- History Modal -->
+
+<!-- ========================================================
+     HISTORY MODAL
+========================================================= -->
+
 <div id="historyModal" class="hidden">
-    <div style="max-width:450px; margin:0 auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
-            <h3 style="margin:0;">🕒 Recently Viewed History</h3>
-            <button onclick="toggleHistoryModal()" style="background:#c0392b; padding:6px 12px;">Close ✕</button>
+    <div class="history-modal-inner">
+
+        <div class="history-header">
+            <h3>🕒 Recently Viewed History</h3>
+
+            <button
+                class="history-close-btn"
+                onclick="toggleHistoryModal()"
+            >
+                Close ✕
+            </button>
         </div>
+
         <div id="historyListContainer"></div>
+
     </div>
 </div>
+
+
+<!-- ========================================================
+     LOGIN
+========================================================= -->
 
 <div id="loginScreen">
+
     <div id="loginBox">
+
         <h2>Enter Access Token</h2>
-        <input id="passwordInput" type="password" placeholder="GitHub Token (ghp_...)">
+
+        <input
+            id="passwordInput"
+            type="password"
+            placeholder="GitHub Token (ghp_...)"
+        >
+
         <br><br>
-        <button id="loginButton">Enter</button>
-        <div id="loginError" style="color:red;margin-top:10px;"></div>
+
+        <button id="loginButton">
+            Enter
+        </button>
+
+        <div
+            id="loginError"
+            style="color:red;margin-top:10px;"
+        ></div>
+
     </div>
+
 </div>
 
-<div id="app">
-    <h1>Media Viewer V4.3</h1>
 
-    <input id="searchInput" type="text" placeholder="Search by URL or number...">
+<!-- ========================================================
+     APPLICATION
+========================================================= -->
+
+<div id="app">
+
+    <h1>Media Viewer V4.4</h1>
+
+
+    <!-- Search -->
+
+    <input
+        id="searchInput"
+        type="text"
+        placeholder="Search by URL or number..."
+    >
+
+
+    <!-- Stats Dashboard -->
 
     <div id="statsDashboard" class="stats-dashboard">
+
         <div class="stat-item">
-            <span class="stat-label">Progress</span>
-            <span id="statProgress" class="stat-value">0%</span>
+            <span class="stat-label">
+                Progress
+            </span>
+
+            <span
+                id="statProgress"
+                class="stat-value"
+            >
+                0%
+            </span>
         </div>
+
+
         <div class="stat-item">
-            <span class="stat-label">Seen</span>
-            <span id="statSeen" class="stat-value">0 / 0</span>
+            <span class="stat-label">
+                Seen
+            </span>
+
+            <span
+                id="statSeen"
+                class="stat-value"
+            >
+                0 / 0
+            </span>
         </div>
+
+
         <div class="stat-item">
-            <span class="stat-label">Hearts</span>
-            <span id="statHearts" class="stat-value">0</span>
+            <span class="stat-label">
+                Hearts
+            </span>
+
+            <span
+                id="statHearts"
+                class="stat-value"
+            >
+                0
+            </span>
         </div>
+
+
         <div class="stat-item">
-            <span class="stat-label">Remaining</span>
-            <span id="statRemaining" class="stat-value">0</span>
+            <span class="stat-label">
+                Remaining
+            </span>
+
+            <span
+                id="statRemaining"
+                class="stat-value"
+            >
+                0
+            </span>
         </div>
+
     </div>
+
+
+    <!-- Top Controls -->
 
     <div id="topControls" class="controls"></div>
 
+
+    <!-- Status -->
+
     <div id="status"></div>
+
+
+    <!-- Media -->
 
     <div id="mediaContainer"></div>
 
+
+    <!-- Bottom Controls -->
+
     <div id="bottomControls" class="controls"></div>
 
+
+    <!-- Footer -->
+
     <div class="footer-container">
-        <button class="clear-btn" onclick="clearAllData()">🗑 Clear All History & Hearts</button>
-        <button class="logout-btn" onclick="logoutGitHub()">🔒 Logout / Reset GitHub Token</button>
+
+        <button
+            class="clear-btn"
+            onclick="clearAllData()"
+        >
+            🗑 Clear All History & Hearts
+        </button>
+
+        <button
+            class="logout-btn"
+            onclick="logoutGitHub()"
+        >
+            🔒 Logout / Reset GitHub Token
+        </button>
+
     </div>
+
 </div>
+
 
 <script src="app.js"></script>
 
