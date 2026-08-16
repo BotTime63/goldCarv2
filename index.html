@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
 
-<title>Media Viewer V4.1 - GitHub Sync</title>
+<title>Media Viewer V4.3 - GitHub Sync</title>
 
 <style>
 * {
@@ -32,7 +32,7 @@ body {
     font-family: Arial, Helvetica, sans-serif;
     text-align: center;
     user-select: none;
-    -webkit-touch-callout: none;
+    -webkit-touch-callout: default; /* Allows iOS long-press menu to save media */
 }
 
 h1 {
@@ -46,8 +46,7 @@ a {
 }
 
 img, video {
-    -webkit-user-drag: none;
-    user-select: none;
+    user-select: auto; /* Allows normal selection/saving */
 }
 
 /* Media */
@@ -71,8 +70,9 @@ img, video {
     object-fit: contain;
     background: #000;
     display: block;
-    touch-action: pan-x pan-y pinch-zoom;
+    touch-action: pan-x pan-y pinch-zoom; /* Enables smooth pinch-to-zoom */
     cursor: pointer;
+    -webkit-touch-callout: default !important; /* Ensures iOS long press works on media */
 }
 
 .media-number {
@@ -198,6 +198,7 @@ button:hover {
 .swipe-mode-btn { background: #2980b9; }
 .history-btn { background: #34495e; }
 .sync-btn { background: #27ae60; font-weight: bold; }
+.autoplay-btn { background: #16a085; font-weight: bold; }
 
 /* Swipe Mode Action Bar */
 .swipe-actions {
@@ -375,7 +376,7 @@ button:hover {
 </div>
 
 <div id="app">
-    <h1>Media Viewer V4.1</h1>
+    <h1>Media Viewer V4.3</h1>
 
     <input id="searchInput" type="text" placeholder="Search by URL or number...">
 
@@ -449,7 +450,6 @@ document.getElementById("passwordInput").addEventListener("keypress", (e) => {
     if (e.key === "Enter") checkPassword();
 });
 
-// Auto-login if token already stored in localStorage
 window.addEventListener("DOMContentLoaded", () => {
     if(GITHUB_CONFIG.token){
         document.getElementById("loginScreen").style.display = "none";
@@ -481,6 +481,11 @@ let seenItems = new Set();
 let heartedItems = new Set();
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
+
+// Auto Play State
+let autoPlayActive = false;
+let autoPlayTimer = null;
+let autoPlayInterval = 5000; // Default 5 seconds
 
 /* ==========================================================
    GITHUB API SAVE & LOAD FUNCTIONS
@@ -685,7 +690,6 @@ function toggleHeart(index){
         }
     });
 
-    // Update swipe action button text if in swipe mode
     document.querySelectorAll(".swipe-action-btn").forEach(btn => {
         if(btn.dataset.index == index) {
             btn.textContent = heartedItems.has(index) ? "❤️ Unheart" : "❤️ Heart";
@@ -696,6 +700,13 @@ function toggleHeart(index){
 
     if(heartMode && !heartedItems.has(index)){
         applySearch();
+    }
+
+    // In swipe mode, if heart is added, auto go to the next item
+    if(swipeMode && heartedItems.has(index)){
+        setTimeout(() => {
+            nextRandomPage();
+        }, 350);
     }
 }
 
@@ -729,6 +740,38 @@ function toggleSwipeMode(){
     currentIndex = 0;
     render();
     snapToTop();
+}
+
+/* ==========================================================
+   AUTO PLAY SYSTEM
+========================================================== */
+function toggleAutoPlay(){
+    autoPlayActive = !autoPlayActive;
+    if(autoPlayActive){
+        startAutoPlayTimer();
+    } else {
+        stopAutoPlayTimer();
+    }
+    renderControls();
+}
+
+function startAutoPlayTimer(){
+    stopAutoPlayTimer();
+    autoPlayTimer = setInterval(() => {
+        nextRandomPage();
+    }, autoPlayInterval);
+}
+
+function stopAutoPlayTimer(){
+    if(autoPlayTimer) clearInterval(autoPlayTimer);
+    autoPlayTimer = null;
+}
+
+function changeAutoPlaySpeed(val){
+    autoPlayInterval = Number(val);
+    if(autoPlayActive){
+        startAutoPlayTimer();
+    }
 }
 
 /* ==========================================================
@@ -857,11 +900,22 @@ function setupObserver(){
 ========================================================== */
 function renderControls(){
     const html = `
-        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
-        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
-        <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
-        <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
+        <div style="display:flex; justify-content:center; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
+            <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+            <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
+            <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+            <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
+        </div>
+        <div style="display:flex; justify-content:center; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:5px;">
+            <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
+            <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
+            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:7px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:12px;">
+                <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
+                <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
+                <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
+                <option value="12000" ${autoPlayInterval === 12000 ? 'selected' : ''}>12s</option>
+            </select>
+        </div>
     `;
     document.getElementById("topControls").innerHTML = html;
     document.getElementById("bottomControls").innerHTML = html;
@@ -945,24 +999,26 @@ function render(){
                 updateStatsDashboard();
             }
 
-            // Touch swipe gesture listeners for swipe mode
             let touchStartX = 0;
             let touchEndX = 0;
 
             wrapper.addEventListener("touchstart", (e) => {
-                touchStartX = e.changedTouches[0].screenX;
+                // Only trigger swipe if single touch
+                if(e.touches.length === 1) {
+                    touchStartX = e.changedTouches[0].screenX;
+                }
             }, {passive: true});
 
             wrapper.addEventListener("touchend", (e) => {
-                touchEndX = e.changedTouches[0].screenX;
-                const diff = touchEndX - touchStartX;
-                if (Math.abs(diff) > 70) {
-                    if (diff < 0) {
-                        // Swiped Left -> Skip
-                        nextRandomPage();
-                    } else {
-                        // Swiped Right -> Toggle Heart
-                        toggleHeart(item.index);
+                if(e.changedTouches.length === 1) {
+                    touchEndX = e.changedTouches[0].screenX;
+                    const diff = touchEndX - touchStartX;
+                    if (Math.abs(diff) > 70) {
+                        if (diff < 0) {
+                            nextRandomPage();
+                        } else {
+                            toggleHeart(item.index);
+                        }
                     }
                 }
             }, {passive: true});
