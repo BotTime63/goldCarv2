@@ -196,6 +196,7 @@ button:hover {
 .heart-mode-btn { background: #e91e63; }
 .swipe-mode-btn { background: #2980b9; }
 .history-btn { background: #34495e; }
+.sync-btn { background: #27ae60; font-weight: bold; }
 
 /* Swipe Mode Action Bar */
 .swipe-actions {
@@ -466,31 +467,27 @@ async function fetchGitHubFile(path) {
 }
 
 async function saveGitHubFile(path, dataArray) {
-    try {
-        const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
-        const existing = await fetchGitHubFile(path);
-        const sha = existing ? existing.sha : undefined;
-        const contentBase64 = btoa(JSON.stringify(dataArray, null, 2));
+    const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
+    const existing = await fetchGitHubFile(path);
+    const sha = existing ? existing.sha : undefined;
+    const contentBase64 = btoa(JSON.stringify(dataArray, null, 2));
 
-        const body = {
-            message: `Update ${path} from Mobile Viewer`,
-            content: contentBase64,
-            branch: GITHUB_CONFIG.branch
-        };
-        if(sha) body.sha = sha;
+    const body = {
+        message: `Update ${path} from Mobile Viewer`,
+        content: contentBase64,
+        branch: GITHUB_CONFIG.branch
+    };
+    if(sha) body.sha = sha;
 
-        await fetch(url, {
-            method: "PUT",
-            headers: {
-                "Authorization": `token ${GITHUB_CONFIG.token}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(body)
-        });
-    } catch(error) {
-        console.log(`Failed to save ${path} to GitHub:`, error);
-    }
-    updateStatsDashboard();
+    const res = await fetch(url, {
+        method: "PUT",
+        headers: {
+            "Authorization": `token ${GITHUB_CONFIG.token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error(`Failed to commit ${path}`);
 }
 
 async function loadServerData(){
@@ -507,12 +504,21 @@ async function loadServerData(){
     updateStatsDashboard();
 }
 
-async function saveHearts(){
-    await saveGitHubFile("saved_hearts.json", [...heartedItems]);
-}
+async function manualSyncToGitHub(){
+    const statusEl = document.getElementById("status");
+    statusEl.style.color = "#00AAFF";
+    statusEl.textContent = "💾 Saving hearts and seen data to GitHub...";
 
-async function saveSeen(){
-    await saveGitHubFile("seen_media.json", [...seenItems]);
+    try {
+        await saveGitHubFile("saved_hearts.json", [...heartedItems]);
+        await saveGitHubFile("seen_media.json", [...seenItems]);
+        statusEl.style.color = "#2ecc71";
+        statusEl.textContent = "✅ Successfully saved to GitHub!";
+        setTimeout(() => { statusEl.textContent = ""; }, 4000);
+    } catch(error) {
+        statusEl.style.color = "#ff6666";
+        statusEl.textContent = "❌ Failed to save: " + error.message;
+    }
 }
 
 function saveSettings(){
@@ -635,8 +641,6 @@ function toggleHeart(index){
         heartedItems.add(index);
     }
 
-    saveHearts();
-
     document.querySelectorAll(".heart-btn").forEach(btn => {
         if(Number(btn.dataset.index) === index){
             const active = heartedItems.has(index);
@@ -645,6 +649,8 @@ function toggleHeart(index){
             else btn.classList.remove("active");
         }
     });
+
+    updateStatsDashboard();
 
     if(heartMode && !heartedItems.has(index)){
         applySearch();
@@ -734,14 +740,11 @@ function jumpToHistoryItem(index){
 }
 
 function clearAllData(){
-    if(!confirm("Clear all GitHub hearts and seen media history?")) return;
+    if(!confirm("Clear all hearts and seen media history? (Don't forget to click Save to GitHub afterwards to commit changes!)")) return;
 
     heartedItems.clear();
     seenItems.clear();
     recentHistory = [];
-
-    saveHearts();
-    saveSeen();
 
     document.querySelectorAll(".heart-btn").forEach(btn => {
         btn.textContent = "♡";
@@ -784,7 +787,7 @@ function setupObserver(){
                     const index = Number(entry.target.dataset.index);
                     if(index && !heartMode && !seenItems.has(index)){
                         seenItems.add(index);
-                        saveSeen();
+                        updateStatsDashboard();
 
                         const numberEl = document.getElementById(`num-${index}`);
                         if(numberEl && !numberEl.querySelector(".seen-badge")) {
@@ -816,6 +819,7 @@ function renderControls(){
         <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
         <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
         <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+        <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
     `;
     document.getElementById("topControls").innerHTML = html;
     document.getElementById("bottomControls").innerHTML = html;
@@ -896,7 +900,7 @@ function render(){
 
             if(!heartMode && !seenItems.has(item.index)){
                 seenItems.add(item.index);
-                saveSeen();
+                updateStatsDashboard();
             }
         }
 
@@ -928,7 +932,6 @@ function nextRandomPage(){
 
         if(workingList.length === 0){
             seenItems.clear();
-            saveSeen();
             workingList = buildDisplayList();
             shuffleArray(workingList);
             document.getElementById("status").textContent = "🎉 Cycle complete. Starting again.";
