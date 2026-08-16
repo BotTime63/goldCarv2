@@ -45,6 +45,12 @@ let observer = null;
 let observerTimeout = null;
 let recentHistory = [];
 
+// Auto-Play State
+let autoPlayIntervalId = null;
+let autoPlaySpeedIndex = 0; // 0: OFF, 1: 2s, 2: 4s, 3: 6s
+const AUTO_PLAY_SPEEDS = [0, 2000, 4000, 6000];
+const AUTO_PLAY_LABELS = ["▶️ Auto: OFF", "▶️ Auto: 2s", "▶️ Auto: 4s", "▶️ Auto: 6s"];
+
 const STORAGE = {
     heartMode: "mediaViewerHeartMode",
     swipeMode: "mediaViewerSwipeMode",
@@ -327,7 +333,8 @@ if(searchInput) {
    HEART SYSTEM & DOUBLE TAP
 ========================================================== */
 function toggleHeart(index){
-    if(heartedItems.has(index)){
+    const wasHearted = heartedItems.has(index);
+    if(wasHearted){
         heartedItems.delete(index);
     } else {
         heartedItems.add(index);
@@ -346,6 +353,11 @@ function toggleHeart(index){
 
     if(heartMode && !heartedItems.has(index)){
         applySearch();
+    }
+
+    // Auto-advance in swipe mode when hearting
+    if(swipeMode && !wasHearted && heartedItems.has(index)){
+        nextRandomPage();
     }
 }
 
@@ -379,6 +391,32 @@ function toggleSwipeMode(){
     currentIndex = 0;
     render();
     snapToTop();
+}
+
+/* ==========================================================
+   AUTO-PLAY MODE
+========================================================== */
+function toggleAutoPlaySpeed() {
+    autoPlaySpeedIndex = (autoPlaySpeedIndex + 1) % AUTO_PLAY_SPEEDS.length;
+    
+    if (autoPlayIntervalId) {
+        clearInterval(autoPlayIntervalId);
+        autoPlayIntervalId = null;
+    }
+
+    const speed = AUTO_PLAY_SPEEDS[autoPlaySpeedIndex];
+    if (speed > 0) {
+        // Automatically ensure swipe mode is on for best auto-play experience
+        if (!swipeMode) {
+            swipeMode = true;
+            saveSettings();
+        }
+        autoPlayIntervalId = setInterval(() => {
+            nextRandomPage();
+        }, speed);
+    }
+
+    renderControls();
 }
 
 /* ==========================================================
@@ -451,7 +489,6 @@ function clearHearts(){
     applySearch();
 }
 
-// Alias to match index.html clear button function name
 function clearAllData() {
     clearHearts();
 }
@@ -517,11 +554,15 @@ function setupObserver(){
    RENDER SYSTEM
 ========================================================== */
 function renderControls(){
+    const autoPlayLabel = AUTO_PLAY_LABELS[autoPlaySpeedIndex];
+    const autoPlayBg = autoPlaySpeedIndex > 0 ? "#8e44ad" : "#34495e";
+
     const html = `
-        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
-        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
         <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+        <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
+        <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+        <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
+        <button class="autoplay-btn" onclick="toggleAutoPlaySpeed()" style="background:${autoPlayBg}; color:white;">${autoPlayLabel}</button>
         <button class="backup-btn" onclick="manualBackupToGitHub()" style="background:#27ae60; color:white;">💾 Backup</button>
     `;
     const topCtrl = document.getElementById("topControls");
