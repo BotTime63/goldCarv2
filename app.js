@@ -253,8 +253,14 @@ function createMediaElement(item){
 ========================================================== */
 function snapToTop(){
     if(swipeMode){
-        // Scroll to ideal viewing frame (~60% hands-free sweet spot for iPhone 11)
-        window.scrollTo({ top: 120, behavior: "smooth" });
+        // Scroll directly to the top active media container (#number at highest screen position)
+        const activeWrapper = document.querySelector(".media-container");
+        if(activeWrapper){
+            const topPos = activeWrapper.getBoundingClientRect().top + window.pageYOffset - 10;
+            window.scrollTo({ top: Math.max(0, topPos), behavior: "smooth" });
+        } else {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
     } else {
         window.scrollTo({ top: 0, behavior: "instant" });
     }
@@ -547,10 +553,10 @@ function setupObserver(){
 function renderControls(){
     const html = `
         <div style="display:flex; justify-content:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
-            <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-            <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
             <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
+            <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
             <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
+            <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
         </div>
         <div style="display:flex; justify-content:center; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
             <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
@@ -648,6 +654,7 @@ function render(){
             `;
             wrapper.appendChild(swipeActions);
 
+            // Mark as seen immediately in swipe mode regardless of time spent
             if(!heartMode && !seenItems.has(item.index)){
                 seenItems.add(item.index);
                 updateStatsDashboard();
