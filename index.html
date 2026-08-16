@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
 
-<title>Media Viewer V4 - GitHub Sync</title>
+<title>Media Viewer V4.1 - GitHub Sync</title>
 
 <style>
 * {
@@ -59,6 +59,7 @@ img, video {
     margin: 0;
     padding: 0 0 15px;
     position: relative;
+    touch-action: pan-y;
 }
 
 .media-container img,
@@ -241,24 +242,40 @@ button:hover {
     margin: 40px 0 60px;
     padding-top: 20px;
     border-top: 1px solid #222;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
 }
 
 .clear-btn {
     background: transparent;
-    color: #666;
-    border: 1px dashed #444;
+    color: #ff6b6b;
+    border: 1px dashed #ff6b6b;
     font-size: 12px;
     padding: 8px 14px;
     border-radius: 6px;
-    opacity: 0.7;
+    opacity: 0.8;
     transition: all 0.2s ease;
 }
 
 .clear-btn:hover {
     opacity: 1;
-    color: #ff6b6b;
-    border-color: #ff6b6b;
-    background: rgba(255, 107, 107, 0.05);
+    background: rgba(255, 107, 107, 0.1);
+}
+
+.logout-btn {
+    background: transparent;
+    color: #888;
+    border: 1px dashed #555;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+.logout-btn:hover {
+    color: #fff;
+    border-color: #888;
+    background: rgba(255, 255, 255, 0.05);
 }
 
 /* Controls */
@@ -358,7 +375,7 @@ button:hover {
 </div>
 
 <div id="app">
-    <h1>Media Viewer V4</h1>
+    <h1>Media Viewer V4.1</h1>
 
     <input id="searchInput" type="text" placeholder="Search by URL or number...">
 
@@ -391,6 +408,7 @@ button:hover {
 
     <div class="footer-container">
         <button class="clear-btn" onclick="clearAllData()">🗑 Clear All History & Hearts</button>
+        <button class="logout-btn" onclick="logoutGitHub()">🔒 Logout / Reset GitHub Token</button>
     </div>
 </div>
 
@@ -401,7 +419,7 @@ button:hover {
 const GITHUB_CONFIG = {
     owner: "bottime63",
     repo: "goldCar",
-    token: "",
+    token: localStorage.getItem("mediaViewerToken") || "",
     branch: "main"
 };
 
@@ -410,6 +428,7 @@ function checkPassword(){
 
     if(tokenInput.startsWith("ghp_") || tokenInput.startsWith("github_pat_")){
         GITHUB_CONFIG.token = tokenInput;
+        localStorage.setItem("mediaViewerToken", tokenInput);
         document.getElementById("loginScreen").style.display = "none";
         document.getElementById("app").style.display = "block";
         initializeApp();
@@ -418,9 +437,25 @@ function checkPassword(){
     }
 }
 
+function logoutGitHub(){
+    if(confirm("Logout and remove saved GitHub token from this device?")){
+        localStorage.removeItem("mediaViewerToken");
+        location.reload();
+    }
+}
+
 document.getElementById("loginButton").addEventListener("click", checkPassword);
 document.getElementById("passwordInput").addEventListener("keypress", (e) => {
     if (e.key === "Enter") checkPassword();
+});
+
+// Auto-login if token already stored in localStorage
+window.addEventListener("DOMContentLoaded", () => {
+    if(GITHUB_CONFIG.token){
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        initializeApp();
+    }
 });
 
 /* ==========================================================
@@ -647,6 +682,13 @@ function toggleHeart(index){
             btn.textContent = active ? "❤️" : "♡";
             if(active) btn.classList.add("active");
             else btn.classList.remove("active");
+        }
+    });
+
+    // Update swipe action button text if in swipe mode
+    document.querySelectorAll(".swipe-action-btn").forEach(btn => {
+        if(btn.dataset.index == index) {
+            btn.textContent = heartedItems.has(index) ? "❤️ Unheart" : "❤️ Heart";
         }
     });
 
@@ -894,7 +936,7 @@ function render(){
             swipeActions.className = "swipe-actions";
             swipeActions.innerHTML = `
                 <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
-                <button class="swipe-action-btn" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
+                <button class="swipe-action-btn" data-index="${item.index}" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
             `;
             wrapper.appendChild(swipeActions);
 
@@ -902,6 +944,28 @@ function render(){
                 seenItems.add(item.index);
                 updateStatsDashboard();
             }
+
+            // Touch swipe gesture listeners for swipe mode
+            let touchStartX = 0;
+            let touchEndX = 0;
+
+            wrapper.addEventListener("touchstart", (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, {passive: true});
+
+            wrapper.addEventListener("touchend", (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                const diff = touchEndX - touchStartX;
+                if (Math.abs(diff) > 70) {
+                    if (diff < 0) {
+                        // Swiped Left -> Skip
+                        nextRandomPage();
+                    } else {
+                        // Swiped Right -> Toggle Heart
+                        toggleHeart(item.index);
+                    }
+                }
+            }, {passive: true});
         }
 
         container.appendChild(wrapper);
