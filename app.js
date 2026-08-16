@@ -1,5 +1,5 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.3 Logic (Fixed GitHub Sync & Clear)
+   APP.JS - Media Viewer V4.4 (Preloading & Centered Layout)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -33,7 +33,7 @@ let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 // Auto Play State
 let autoPlayActive = false;
 let autoPlayTimer = null;
-let autoPlayInterval = 5000; // Default 5 seconds
+let autoPlayInterval = 5000;
 
 /* ==========================================================
    AUTHENTICATION & INITIALIZATION
@@ -45,7 +45,7 @@ function checkPassword(){
         GITHUB_CONFIG.token = tokenInput;
         localStorage.setItem("mediaViewerToken", tokenInput);
         document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "block";
+        document.getElementById("app").style.display = "flex";
         initializeApp();
     } else {
         document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(GITHUB_CONFIG.token){
         document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "block";
+        document.getElementById("app").style.display = "flex";
         initializeApp();
     }
 });
@@ -199,7 +199,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA DETECTION
+   MEDIA DETECTION & PRELOADING
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
@@ -215,6 +215,18 @@ function normalizeImageURL(url){
         src = src.replace("imgur.com/", "i.imgur.com/") + ".jpg";
     }
     return src;
+}
+
+// Preload the next 3 items in the background for zero-stutter swiping/autoplay
+function preloadNextItems(){
+    const preloadCount = 3;
+    for(let i = currentIndex; i < Math.min(currentIndex + preloadCount, workingList.length); i++){
+        const item = workingList[i];
+        if(item && isImage(item.url)){
+            const img = new Image();
+            img.src = normalizeImageURL(item.url);
+        }
+    }
 }
 
 function createMediaElement(item){
@@ -306,7 +318,7 @@ function toggleHeart(index){
     if(swipeMode && heartedItems.has(index)){
         setTimeout(() => {
             nextRandomPage();
-        }, 350);
+        }, 300);
     }
 }
 
@@ -525,16 +537,16 @@ function setupObserver(){
 ========================================================== */
 function renderControls(){
     const html = `
-        <div style="display:flex; justify-content:center; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
+        <div style="display:flex; justify-content:center; gap:5px; margin-bottom:4px; flex-wrap:wrap;">
             <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
             <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
             <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
             <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
         </div>
-        <div style="display:flex; justify-content:center; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:5px;">
+        <div style="display:flex; justify-content:center; gap:5px; align-items:center; flex-wrap:wrap; margin-bottom:4px;">
             <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
             <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
-            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:7px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:12px;">
+            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:6px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:11px;">
                 <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
                 <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
                 <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
@@ -656,6 +668,9 @@ function render(){
         container.appendChild(wrapper);
         shown++;
     }
+
+    // Trigger background preloading for subsequent items
+    preloadNextItems();
 
     if(!swipeMode){
         setupObserver();
