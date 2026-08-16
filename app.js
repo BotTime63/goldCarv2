@@ -1813,27 +1813,47 @@ function renderControls() {
 
 
             <select
-                onchange="changeAutoPlaySpeed(this.value)"
-            >
+    onchange="changeAutoPlaySpeed(this.value)"
+>
 
-                <option
-                    value="3000"
-                    ${autoPlayInterval === 3000
-                        ? "selected"
-                        : ""}
-                >
-                    3s
-                </option>
+    <option
+        value="1000"
+        ${autoPlayInterval === 1000
+            ? "selected"
+            : ""}
+    >
+        1s
+    </option>
 
 
-                <option
-                    value="5000"
-                    ${autoPlayInterval === 5000
-                        ? "selected"
-                        : ""}
-                >
-                    5s
-                </option>
+    <option
+        value="2000"
+        ${autoPlayInterval === 2000
+            ? "selected"
+            : ""}
+    >
+        2s
+    </option>
+
+
+    <option
+        value="3000"
+        ${autoPlayInterval === 3000
+            ? "selected"
+            : ""}
+    >
+        3s
+    </option>
+
+
+    <option
+        value="5000"
+        ${autoPlayInterval === 5000
+            ? "selected"
+            : ""}
+    >
+        5s
+    </option>
 
 
                 <option
@@ -2134,51 +2154,56 @@ function render() {
         ================================================== */
 
         const media =
-            createMediaElement(
-                item
-            );
+    createMediaElement(
+        item
+    );
 
+if (media) {
 
-        if (media) {
+    if (swipeMode) {
 
-            media.addEventListener(
-                "click",
-                (e) => {
+        media.style.maxWidth = "100%";
+        media.style.maxHeight = "85vh";
+        media.style.width = "auto";
+        media.style.height = "auto";
+        media.style.objectFit = "contain";
+        media.style.display = "block";
+        media.style.margin = "0 auto";
+    }
 
-                    const currentTime =
-                        new Date().getTime();
+    media.addEventListener(
+        "click",
+        (e) => {
 
+            const currentTime =
+                new Date().getTime();
 
-                    const tapLength =
-                        currentTime -
-                        lastTapTime;
+            const tapLength =
+                currentTime -
+                lastTapTime;
 
+            if (
+                tapLength < 300 &&
+                tapLength > 0
+            ) {
 
-                    if (
-                        tapLength < 300 &&
-                        tapLength > 0
-                    ) {
+                e.preventDefault();
 
-                        e.preventDefault();
+                handleDoubleTap(
+                    item.index,
+                    wrapper
+                );
+            }
 
-
-                        handleDoubleTap(
-                            item.index,
-                            wrapper
-                        );
-                    }
-
-
-                    lastTapTime =
-                        currentTime;
-                }
-            );
-
-
-            wrapper.appendChild(
-                media
-            );
+            lastTapTime =
+                currentTime;
         }
+    );
+
+    wrapper.appendChild(
+        media
+    );
+}
 
 
         /* ==================================================
