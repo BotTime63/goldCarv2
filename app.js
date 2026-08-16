@@ -154,7 +154,6 @@ function flushChanges(useKeepalive = false) {
     }
 }
 
-// Manual Backup Function triggered by the new button
 async function manualBackupToGitHub() {
     const statusEl = document.getElementById("status");
     if(statusEl) statusEl.textContent = "⏳ Backing up to GitHub...";
@@ -452,6 +451,11 @@ function clearHearts(){
     applySearch();
 }
 
+// Alias to match index.html clear button function name
+function clearAllData() {
+    clearHearts();
+}
+
 /* ==========================================================
    BUILD DISPLAY LIST
 ========================================================== */
@@ -510,7 +514,7 @@ function setupObserver(){
 }
 
 /* ==========================================================
-   RENDER SYSTEM (Now includes Backup Button)
+   RENDER SYSTEM
 ========================================================== */
 function renderControls(){
     const html = `
