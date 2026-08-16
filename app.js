@@ -1,5 +1,5 @@
 /* ==========================================================
-   APP.JS - Media Viewer V4.4 (Preloading & Centered Layout)
+   APP.JS - Media Viewer V4.5 (Normal Scroll + Preload)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -45,7 +45,7 @@ function checkPassword(){
         GITHUB_CONFIG.token = tokenInput;
         localStorage.setItem("mediaViewerToken", tokenInput);
         document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "flex";
+        document.getElementById("app").style.display = "block";
         initializeApp();
     } else {
         document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if(GITHUB_CONFIG.token){
         document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("app").style.display = "flex";
+        document.getElementById("app").style.display = "block";
         initializeApp();
     }
 });
@@ -318,7 +318,7 @@ function toggleHeart(index){
     if(swipeMode && heartedItems.has(index)){
         setTimeout(() => {
             nextRandomPage();
-        }, 300);
+        }, 350);
     }
 }
 
@@ -537,16 +537,16 @@ function setupObserver(){
 ========================================================== */
 function renderControls(){
     const html = `
-        <div style="display:flex; justify-content:center; gap:5px; margin-bottom:4px; flex-wrap:wrap;">
+        <div style="display:flex; justify-content:center; gap:5px; margin-bottom:5px; flex-wrap:wrap;">
             <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
             <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
             <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
             <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
         </div>
-        <div style="display:flex; justify-content:center; gap:5px; align-items:center; flex-wrap:wrap; margin-bottom:4px;">
+        <div style="display:flex; justify-content:center; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:5px;">
             <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save to GitHub</button>
             <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
-            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:6px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:11px;">
+            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:7px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:12px;">
                 <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
                 <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
                 <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
