@@ -122,7 +122,7 @@ html, body {
     font-weight: normal;
 }
 
-/* Action Header Row (Heart & Save to Camera Roll) */
+/* Action Header Row (Heart & Max Screen) */
 .media-actions-row {
     display: flex;
     align-items: center;
@@ -149,8 +149,8 @@ html, body {
     color: #ff2d55;
 }
 
-/* Save to Camera Roll Button */
-.save-camera-btn {
+/* Max Screen Button */
+.max-screen-btn {
     background: rgba(56, 189, 248, 0.1);
     border: 1px solid rgba(56, 189, 248, 0.3);
     color: #38bdf8;
@@ -165,7 +165,7 @@ html, body {
     transition: background 0.2s, transform 0.1s;
 }
 
-.save-camera-btn:active {
+.max-screen-btn:active {
     transform: scale(0.95);
     background: rgba(56, 189, 248, 0.25);
 }
@@ -189,8 +189,22 @@ html, body {
     background: #050505;
     display: block;
     cursor: pointer;
-    transition: transform 0.1s ease-out;
+    transition: transform 0.1s ease-out, width 0.2s ease, max-height 0.2s ease;
     -webkit-touch-callout: default !important;
+}
+
+/* Max Screen / Edge-to-Edge Mode Modifiers */
+.media-container.max-screen img,
+.media-container.max-screen video {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: calc(100vh - 170px) !important;
+    object-fit: cover !important;
+    border-radius: 0 !important;
+}
+
+.media-container.max-screen .media-wrapper-inner {
+    width: 100vw !important;
 }
 
 .media-container a {
@@ -401,7 +415,7 @@ html, body {
 
 <div id="welcomeBanner">
     🌙 <b>Night Edition V7 Active</b><br><br>
-    Smart iPhone 11 layout with hidden Clear button, fast timers, camera roll save, and smooth swipe gestures.
+    Smart iPhone 11 layout with hidden Clear button, fast timers, max screen view, and smooth swipe gestures.
 </div>
 
 <!-- History Modal -->

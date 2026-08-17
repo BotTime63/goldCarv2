@@ -201,7 +201,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA UTILS & CAMERA ROLL DOWNLOAD (iOS 1-Click Optimized)
+   MEDIA UTILS
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
@@ -217,33 +217,6 @@ function normalizeImageURL(url){
         src = src.replace("imgur.com/", "i.imgur.com/") + ".jpg";
     }
     return src;
-}
-
-function saveToCameraRoll(url, index) {
-    const statusEl = document.getElementById("status");
-    statusEl.style.color = "#38bdf8";
-    statusEl.textContent = `📥 Opening media #${index} for saving...`;
-
-    try {
-        const absoluteUrl = normalizeImageURL(url);
-        const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
-
-        // Reliable 1-click download trick for mobile Safari
-        const a = document.createElement('a');
-        a.href = absoluteUrl;
-        a.target = '_blank';
-        a.download = `media_${index}.${fileExtension}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        statusEl.style.color = "#10b981";
-        statusEl.textContent = `✅ Opened! Long-press image/video to save to Photos.`;
-        setTimeout(() => { statusEl.textContent = ""; }, 4000);
-    } catch (err) {
-        window.open(normalizeImageURL(url), '_blank');
-        statusEl.textContent = "";
-    }
 }
 
 function preloadUpcoming(){
@@ -518,7 +491,7 @@ function render(){
         }
         wrapper.appendChild(numEl);
 
-        // Actions Row (Heart + Camera Roll Save Button)
+        // Actions Row (Heart + Max Screen Toggle Button)
         const actionsRow = document.createElement("div");
         actionsRow.className = "media-actions-row";
 
@@ -529,11 +502,22 @@ function render(){
         heartBtn.onclick = () => toggleHeart(item.index, swipeMode);
         actionsRow.appendChild(heartBtn);
 
-        const saveBtn = document.createElement("button");
-        saveBtn.className = "save-camera-btn";
-        saveBtn.innerHTML = "📥 Save to Photos";
-        saveBtn.onclick = () => saveToCameraRoll(item.url, item.index);
-        actionsRow.appendChild(saveBtn);
+        const maxScreenBtn = document.createElement("button");
+        maxScreenBtn.className = "max-screen-btn";
+        maxScreenBtn.innerHTML = "↔️ Max Screen";
+        maxScreenBtn.onclick = () => {
+            wrapper.classList.toggle("max-screen");
+            if(wrapper.classList.contains("max-screen")){
+                maxScreenBtn.innerHTML = "🔲 Normal Fit";
+                maxScreenBtn.style.background = "rgba(147, 51, 234, 0.25)";
+                maxScreenBtn.style.borderColor = "#9333ea";
+            } else {
+                maxScreenBtn.innerHTML = "↔️ Max Screen";
+                maxScreenBtn.style.background = "";
+                maxScreenBtn.style.borderColor = "";
+            }
+        };
+        actionsRow.appendChild(maxScreenBtn);
 
         wrapper.appendChild(actionsRow);
 
