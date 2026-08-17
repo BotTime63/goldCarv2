@@ -35,6 +35,12 @@ let autoPlayActive = false;
 let autoPlayTimer = null;
 let autoPlayInterval = 2500;
 
+// Swipe Gesture Tracking Variables
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchEndY = 0;
+
 /* ==========================================================
    INIT & AUTH
 ========================================================== */
@@ -131,22 +137,22 @@ async function manualSyncToGitHub(){
 }
 
 /* ==========================================================
-   SETTINGS & CLEAR DATA FUNCTIONALITY
+   CLEAR & SETTINGS MODAL
 ========================================================== */
-function toggleSettingsModal() {
-    const modal = document.getElementById("settingsModal");
-    modal.classList.toggle("hidden");
-}
-
 async function confirmClearData() {
-    if(confirm("Are you sure you want to reset seen_media.json and saved_hearts.json?")) {
+    if(confirm("⚠️ Are you sure you want to reset seen_media.json and saved_hearts.json?")) {
         seenItems.clear();
         heartedItems.clear();
         updateStats();
-        toggleSettingsModal();
         await manualSyncToGitHub();
         applySearch();
+        toggleSettingsModal();
     }
+}
+
+function toggleSettingsModal(){
+    const modal = document.getElementById("settingsModal");
+    modal.classList.toggle("hidden");
 }
 
 function saveSettings(){
@@ -185,11 +191,11 @@ function updateStats(){
         swipeBtn.style.color = swipeMode ? "#c084fc" : "#ccc";
     }
 
-    const autoIcon = document.getElementById("autoPlayIcon");
-    const autoText = document.getElementById("autoPlayText");
+    const autoIcon = document.getElementById("autoPlayIconMenu");
+    const autoText = document.getElementById("autoPlayTextMenu");
     if(autoIcon && autoText){
         autoIcon.textContent = autoPlayActive ? "⏸️" : "▶️";
-        autoText.textContent = autoPlayActive ? "Stop" : "Auto";
+        autoText.textContent = autoPlayActive ? "Stop Auto-Play" : "Start Auto-Play";
     }
 }
 
@@ -205,7 +211,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA UTILS & CAMERA ROLL DOWNLOAD
+   MEDIA UTILS & ONE-TAP CAMERA ROLL SAVE
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
@@ -235,7 +241,7 @@ async function saveToCameraRoll(url, index) {
         const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
         const blobUrl = URL.createObjectURL(blob);
         
-        // Single-tap direct download action trigger
+        // Zero-friction direct download trigger for mobile web / PWA
         const a = document.createElement('a');
         a.href = blobUrl;
         a.download = `media_${index}.${fileExtension}`;
@@ -244,10 +250,10 @@ async function saveToCameraRoll(url, index) {
         document.body.removeChild(a);
         
         statusEl.style.color = "#10b981";
-        statusEl.textContent = `✅ Saved media #${index}!`;
-        setTimeout(() => { statusEl.textContent = ""; }, 3000);
+        statusEl.textContent = `✅ Saved to Photos!`;
+        setTimeout(() => { statusEl.textContent = ""; }, 2500);
     } catch (err) {
-        // Fallback open if CORS restrictions apply
+        // Fallback to direct window open if cross-origin blocks blob fetch
         window.open(normalizeImageURL(url), '_blank');
         statusEl.textContent = "";
     }
@@ -355,8 +361,7 @@ function changeAutoPlaySpeed(val){
    HEARTS & INTERACTIONS
 ========================================================== */
 function toggleHeart(index, autoAdvance = false){
-    const isHearted = heartedItems.has(index);
-    if(isHearted) heartedItems.delete(index);
+    if(heartedItems.has(index)) heartedItems.delete(index);
     else heartedItems.add(index);
 
     updateStats();
@@ -408,51 +413,38 @@ function toggleSwipeMode(){
 }
 
 /* ==========================================================
-   SWIPE GESTURE CONTROLS (Swipe Right = Heart + Next, Swipe Left = Skip)
+   SWIPE GESTURE HANDLERS (Swipe Mode)
 ========================================================== */
-function attachSwipeGestures(wrapperElement, itemIndex) {
-    let startX = 0;
-    let startY = 0;
-    let distX = 0;
-    let distY = 0;
-    const threshold = 70; // minimum distance for swipe
+function handleTouchStart(e) {
+    if (!swipeMode) return;
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+}
 
-    wrapperElement.addEventListener("touchstart", (e) => {
-        if (!swipeMode) return;
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    }, { passive: true });
+function handleTouchEnd(e, itemIndex) {
+    if (!swipeMode) return;
+    touchEndX = e.changedTouches[0].screenX;
+    touchEndY = e.changedTouches[0].screenY;
+    handleSwipeGesture(itemIndex);
+}
 
-    wrapperElement.addEventListener("touchmove", (e) => {
-        if (!swipeMode) return;
-        distX = e.touches[0].clientX - startX;
-        distY = e.touches[0].clientY - startY;
-        
-        // If swiping horizontally more than vertically, provide slight smooth feedback
-        if (Math.abs(distX) > Math.abs(distY) && Math.abs(distX) < 150) {
-            wrapperElement.style.transform = `translateX(${distX * 0.4}px) rotate(${distX * 0.03}deg)`;
-        }
-    }, { passive: true });
-
-    wrapperElement.addEventListener("touchend", () => {
-        if (!swipeMode) return;
-        wrapperElement.style.transform = "";
-
-        if (Math.abs(distX) > threshold && Math.abs(distX) > Math.abs(distY)) {
-            if (distX > 0) {
-                // Swipe RIGHT -> Heart & Advance
-                if (!heartedItems.has(itemIndex)) {
-                    toggleHeart(itemIndex, false);
-                }
-                nextRandomPage();
-            } else {
-                // Swipe LEFT -> Skip without heart
-                nextRandomPage();
+function handleSwipeGesture(itemIndex) {
+    const diffX = touchEndX - touchStartX;
+    const diffY = touchEndY - touchStartY;
+    
+    // Ensure horizontal swipe is dominant and exceeds threshold (70px)
+    if (Math.abs(diffX) > 70 && Math.abs(diffX) > Math.abs(diffY)) {
+        if (diffX > 0) {
+            // SWIPE RIGHT: Heart + Advance
+            if (!heartedItems.has(itemIndex)) {
+                toggleHeart(itemIndex, false);
             }
+            nextRandomPage();
+        } else {
+            // SWIPE LEFT: Skip + Advance (no heart)
+            nextRandomPage();
         }
-        distX = 0;
-        distY = 0;
-    }, { passive: true });
+    }
 }
 
 /* ==========================================================
@@ -555,15 +547,16 @@ function render(){
     while(shown < pageSize && currentIndex < workingList.length){
         const item = workingList[currentIndex];
         currentIndex++;
-        shown++;
         addToHistory(item);
 
         const wrapper = document.createElement("div");
         wrapper.className = "media-container";
         wrapper.dataset.index = item.index;
 
-        if (swipeMode) {
-            attachSwipeGestures(wrapper, item.index);
+        // Attach Swipe Gesture Listeners if Swipe Mode is Active
+        if(swipeMode){
+            wrapper.addEventListener("touchstart", handleTouchStart, {passive: true});
+            wrapper.addEventListener("touchend", (e) => handleTouchEnd(e, item.index), {passive: true});
         }
 
         const numEl = document.createElement("div");
@@ -579,7 +572,7 @@ function render(){
         }
         wrapper.appendChild(numEl);
 
-        // Actions Row (Heart + Camera Roll Save Button)
+        // Actions Row (Heart + One-Tap Camera Roll Save Button)
         const actionsRow = document.createElement("div");
         actionsRow.className = "media-actions-row";
 
@@ -631,33 +624,43 @@ function render(){
             innerWrapper.appendChild(media);
         }
         wrapper.appendChild(innerWrapper);
+
         container.appendChild(wrapper);
+        shown++;
     }
 
-    if(currentIndex >= workingList.length && workingList.length > 0){
-        currentIndex = 0; // Loop list cleanly
-    }
-
-    setupObserver();
+    if(!heartMode) setupObserver();
 }
 
 function nextRandomPage(){
+    if(currentIndex >= workingList.length){
+        currentIndex = 0;
+        shuffleArray(workingList);
+    }
     render();
     snapToTop();
 }
 
-function initializeApp(){
-    fetchGitHubFile("media_urls.json").then(res => {
-        if(res && Array.isArray(res.content)){
-            mediaUrls = res.content.map((url, idx) => ({ index: idx + 1, url }));
-            loadServerData().then(() => {
-                workingList = buildDisplayList();
-                if(!heartMode) shuffleArray(workingList);
-                render();
-                showWelcome();
-            });
-        } else {
-            document.getElementById("status").textContent = "❌ Failed to load media_urls.json from GitHub repository.";
-        }
-    });
+/* ==========================================================
+   INITIALIZATION
+========================================================== */
+async function initializeApp(){
+    showWelcome();
+    const statusEl = document.getElementById("status");
+    statusEl.style.color = "#38bdf8";
+    statusEl.textContent = "⏳ Loading media list from GitHub...";
+
+    const mediaRes = await fetchGitHubFile("media_urls.json");
+    if(mediaRes && Array.isArray(mediaRes.content)){
+        mediaUrls = mediaRes.content.map((url, idx) => ({ index: idx + 1, url }));
+        shuffleArray(mediaUrls);
+        await loadServerData();
+        workingList = buildDisplayList();
+        currentIndex = 0;
+        render();
+        statusEl.textContent = "";
+    } else {
+        statusEl.style.color = "#f87171";
+        statusEl.textContent = "❌ Failed to load media_urls.json from GitHub";
+    }
 }
