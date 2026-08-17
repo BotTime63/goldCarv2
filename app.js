@@ -134,7 +134,6 @@ async function manualSyncToGitHub(){
    CLEAR BUTTON FUNCTIONALITY (Secured / Double Confirmation)
 ========================================================== */
 async function confirmClearData() {
-    // Double confirmation to prevent accidental clicks
     const firstCheck = confirm("⚠️ DANGER: Are you sure you want to completely reset seen_media.json and saved_hearts.json?");
     if(!firstCheck) return;
 
@@ -207,7 +206,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA UTILS & CAMERA ROLL DOWNLOAD
+   MEDIA UTILS & CAMERA ROLL DOWNLOAD (iOS Enhanced)
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
@@ -228,38 +227,33 @@ function normalizeImageURL(url){
 async function saveToCameraRoll(url, index) {
     const statusEl = document.getElementById("status");
     statusEl.style.color = "#38bdf8";
-    statusEl.textContent = `📥 Preparing media #${index}...`;
+    statusEl.textContent = `📥 Preparing media #${index} for Photos...`;
 
     try {
         const absoluteUrl = normalizeImageURL(url);
         const response = await fetch(absoluteUrl, { mode: 'cors' });
         const blob = await response.blob();
         const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
-        const file = new File([blob], `media_${index}.${fileExtension}`, { type: blob.type });
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: `Media #${index}`,
-            });
-            statusEl.textContent = "";
-        } else {
-            // Fallback for browsers without direct file sharing
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = `media_${index}.${fileExtension}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            statusEl.style.color = "#10b981";
-            statusEl.textContent = `✅ Saved! Check your downloads/photos.`;
-            setTimeout(() => { statusEl.textContent = ""; }, 3000);
-        }
+        // Create an Object URL download link optimized for iOS Safari
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `media_${index}.${fileExtension}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Clean up object URL after a brief delay
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+        statusEl.style.color = "#10b981";
+        statusEl.textContent = `✅ Saved! Check your Downloads/Photos.`;
+        setTimeout(() => { statusEl.textContent = ""; }, 3500);
     } catch (err) {
-        // If sharing fails/cancelled, open directly as fallback
+        // Fallback: open directly in a new tab if CORS or direct fetch fails
         window.open(normalizeImageURL(url), '_blank');
-        statusEl.textContent = "";
+        statusEl.style.color = "";
     }
 }
 
@@ -609,13 +603,13 @@ function render(){
                 const diffX = e.changedTouches[0].clientX - startX;
                 const diffY = e.changedTouches[0].clientY - startY;
 
-                // Ensure it's a horizontal swipe rather than vertical scrolling or zooming
+                // Horizontal swipe detection
                 if(Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)){
-                    if(diffX > 0) {
-                        // Swipe right = Heart + Auto advance
+                    if(diffX < 0) {
+                        // Swipe LEFT = Heart + Auto advance
                         toggleHeart(item.index, true);
                     } else {
-                        // Swipe left = Skip / Next Media
+                        // Swipe RIGHT = Skip / Next Media
                         nextRandomPage();
                     }
                 }
