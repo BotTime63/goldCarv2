@@ -240,7 +240,7 @@ html, body {
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 24px;
-    padding: 8px 8px;
+    padding: 8px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -401,7 +401,7 @@ html, body {
 
 <div id="welcomeBanner">
     🌙 <b>Night Edition V7 Active</b><br><br>
-    Smart iPhone 11 layout with Clear button, fast timers, camera roll save, and smooth pinch-zoom.
+    Smart iPhone 11 layout with safe clear button inside history, fast swipe gestures, and direct camera roll save.
 </div>
 
 <!-- History Modal -->
@@ -411,6 +411,16 @@ html, body {
             <h3 style="margin:0; font-size:16px;">🕒 Recently Viewed History</h3>
             <button onclick="toggleHistoryModal()" style="background:#222; color:#fff; border:none; padding:6px 12px; border-radius:8px; cursor:pointer;">Close ✕</button>
         </div>
+
+        <!-- Safe Clear Data Area inside History Drawer -->
+        <div style="background:#18181c; padding:12px; border-radius:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; border:1px solid rgba(255,255,255,0.05);">
+            <div>
+                <div style="font-size:12px; font-weight:bold; color:#fff;">Reset Database Data</div>
+                <div style="font-size:10px; color:#888;">Clear seen_media.json & saved_hearts.json</div>
+            </div>
+            <button onclick="confirmClearData()" style="background:rgba(248,113,113,0.15); color:#f87171; border:1px solid rgba(248,113,113,0.3); padding:6px 12px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">Clear All</button>
+        </div>
+
         <div id="historyListContainer"></div>
     </div>
 </div>
@@ -475,11 +485,6 @@ html, body {
                 <option value="6000">6s</option>
             </select>
         </div>
-
-        <button class="dock-btn" onclick="confirmClearData()" style="color:#f87171;">
-            <span class="icon">🗑️</span>
-            <span>Clear</span>
-        </button>
 
         <button class="dock-btn" onclick="manualSyncToGitHub()" style="color:#38bdf8;">
             <span class="icon">💾</span>
