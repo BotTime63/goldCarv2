@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==========================================================
-   GITHUB SYNC & INITIALIZATION
+   GITHUB SYNC
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
@@ -103,32 +103,6 @@ async function saveGitHubFile(path, dataArray) {
     if(!res.ok) throw new Error(`Failed to save ${path}`);
 }
 
-async function initializeApp() {
-    const statusEl = document.getElementById("status");
-    statusEl.style.color = "#38bdf8";
-    statusEl.textContent = "⏳ Loading mediaNEW.json...";
-
-    // Fetch media links from mediaNEW.json instead of media_urls.json
-    const mediaRes = await fetchGitHubFile("mediaNEW.json");
-    if(!mediaRes || !Array.isArray(mediaRes.content)){
-        statusEl.style.color = "#f87171";
-        statusEl.textContent = "❌ Failed to load mediaNEW.json from GitHub repository";
-        return;
-    }
-
-    // Map content to standard format with indices
-    mediaUrls = mediaRes.content.map((item, idx) => {
-        if(typeof item === "string") return { index: idx + 1, url: item };
-        return { index: item.index || (idx + 1), url: item.url || item };
-    });
-
-    await loadServerData();
-    shuffleArray(mediaUrls);
-    applySearch();
-    showWelcome();
-    statusEl.textContent = "";
-}
-
 async function loadServerData(){
     const heartsRes = await fetchGitHubFile("saved_hearts.json");
     if(heartsRes && Array.isArray(heartsRes.content)) heartedItems = new Set(heartsRes.content);
@@ -157,7 +131,7 @@ async function manualSyncToGitHub(){
 }
 
 /* ==========================================================
-   CLEAR & SETTINGS
+   CLEAR BUTTON FUNCTIONALITY
 ========================================================== */
 async function confirmClearData() {
     if(confirm("Are you sure you want to reset seen_media.json and saved_hearts.json?")) {
@@ -262,6 +236,7 @@ async function saveToCameraRoll(url, index) {
             });
             statusEl.textContent = "";
         } else {
+            // Fallback for browsers without direct file sharing
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = blobUrl;
@@ -274,6 +249,7 @@ async function saveToCameraRoll(url, index) {
             setTimeout(() => { statusEl.textContent = ""; }, 3000);
         }
     } catch (err) {
+        // If sharing fails/cancelled, open directly as fallback
         window.open(normalizeImageURL(url), '_blank');
         statusEl.textContent = "";
     }
@@ -312,7 +288,7 @@ function shuffleArray(array){
 }
 
 /* ==========================================================
-   SEARCH & NAVIGATION
+   SEARCH
 ========================================================== */
 function applySearch(){
     workingList = buildDisplayList();
@@ -339,18 +315,6 @@ function buildDisplayList(){
         list = list.filter(item => !seenItems.has(item.index));
     }
     return list;
-}
-
-function nextRandomPage(){
-    if(currentIndex < workingList.length) {
-        render();
-        snapToTop();
-    } else {
-        shuffleArray(workingList);
-        currentIndex = 0;
-        render();
-        snapToTop();
-    }
 }
 
 /* ==========================================================
@@ -604,25 +568,99 @@ function render(){
             media.loading = "eager";
             media.decoding = "async";
             media.setAttribute("fetchpriority", "high");
-        } else {
-            media = document.createElement("img");
-            media.src = normalizeImageURL(item.url);
         }
 
-        media.addEventListener("click", (e) => {
-            const now = new Date().getTime();
-            if(now - lastTap < 300) {
-                handleDoubleTap(item.index, wrapper);
-            }
-            lastTap = now;
-        });
-
-        innerWrapper.appendChild(media);
+        if(media){
+            media.addEventListener("click", () => {
+                const now = Date.now();
+                if(now - lastTap < 300) handleDoubleTap(item.index, wrapper);
+                lastTap = now;
+            });
+            innerWrapper.appendChild(media);
+        }
         wrapper.appendChild(innerWrapper);
-        container.appendChild(wrapper);
 
+        if(swipeMode && !heartMode && !seenItems.has(item.index)){
+            seenItems.add(item.index);
+            updateStats();
+            const badge = document.createElement("span");
+            badge.className = "seen-badge";
+            badge.textContent = "👀 Seen";
+            numEl.appendChild(badge);
+        }
+
+        if(swipeMode){
+            let startX = 0;
+            let startY = 0;
+            wrapper.addEventListener("touchstart", e => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }, {passive:true});
+
+            wrapper.addEventListener("touchend", e => {
+                const diffX = e.changedTouches[0].clientX - startX;
+                const diffY = e.changedTouches[0].clientY - startY;
+
+                // Ensure it's a horizontal swipe rather than vertical scrolling or zooming
+                if(Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)){
+                    if(diffX < 0) {
+                        // Swipe left = Skip / No heart
+                        nextRandomPage();
+                    } else {
+                        // Swipe right = Heart + Auto advance
+                        toggleHeart(item.index, true);
+                    }
+                }
+            }, {passive:true});
+        }
+
+        container.appendChild(wrapper);
         shown++;
     }
 
-    setupObserver();
+    if(!swipeMode){
+        setupObserver();
+    }
+}
+
+function nextRandomPage(){
+    snapToTop();
+    if(heartMode){
+        if(currentIndex >= workingList.length){
+            shuffleArray(workingList);
+            currentIndex = 0;
+        }
+    } else {
+        workingList = buildDisplayList();
+        shuffleArray(workingList);
+        currentIndex = 0;
+        if(workingList.length === 0){
+            seenItems.clear();
+            workingList = buildDisplayList();
+            shuffleArray(workingList);
+        }
+    }
+    render();
+}
+
+/* ==========================================================
+   INITIALIZE
+========================================================== */
+async function initializeApp(){
+    try {
+        const res = await fetch("mediaNEW.json?t=" + Date.now());
+        if(!res.ok) throw new Error("Failed to load mediaNEW.json");
+        const data = await res.json();
+
+        mediaUrls = data.map((url, i) => ({ url, index: i + 1 }));
+        await loadServerData();
+        showWelcome();
+
+        workingList = buildDisplayList();
+        shuffleArray(workingList);
+        currentIndex = 0;
+        render();
+    } catch(e) {
+        document.getElementById("status").textContent = "Error: " + e.message;
+    }
 }
