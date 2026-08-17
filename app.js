@@ -131,7 +131,7 @@ async function manualSyncToGitHub(){
 }
 
 /* ==========================================================
-   CLEAR DATA FUNCTIONALITY (Moved to History Drawer)
+   CLEAR DATA FUNCTIONALITY (Safely inside History Modal)
 ========================================================== */
 async function confirmClearData() {
     if(confirm("Are you sure you want to reset seen_media.json and saved_hearts.json?")) {
@@ -230,7 +230,6 @@ async function saveToCameraRoll(url, index) {
         const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
         const file = new File([blob], `media_${index}.${fileExtension}`, { type: blob.type });
 
-        // Direct 1-tap save via Web Share API if available on iOS Safari
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({
                 files: [file],
@@ -238,7 +237,6 @@ async function saveToCameraRoll(url, index) {
             });
             statusEl.textContent = "";
         } else {
-            // Direct download link fallback
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = blobUrl;
@@ -493,7 +491,7 @@ function setupObserver(){
 }
 
 /* ==========================================================
-   RENDER & SWIPE GESTURES
+   RENDER & SWAPPED SWIPE GESTURES
 ========================================================== */
 function render(){
     updateStats();
@@ -516,7 +514,7 @@ function render(){
         wrapper.className = "media-container";
         wrapper.dataset.index = item.index;
 
-        // Swipe Gesture Handling for Swipe Mode
+        // Swapped Swipe Gesture Handling for Swipe Mode
         let touchStartX = 0;
         let touchEndX = 0;
         let touchStartY = 0;
@@ -536,14 +534,14 @@ function render(){
 
             // Ensure horizontal swipe is dominant and significant (> 60px)
             if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY)) {
-                if (diffX > 0) {
-                    // Swipe Right -> Heart and auto-advance
+                if (diffX < 0) {
+                    // Swipe Left -> Heart and auto-advance
                     if (!heartedItems.has(item.index)) {
                         toggleHeart(item.index, false);
                     }
                     nextRandomPage();
                 } else {
-                    // Swipe Left -> Skip without hearting
+                    // Swipe Right -> Skip without hearting
                     nextRandomPage();
                 }
             }
