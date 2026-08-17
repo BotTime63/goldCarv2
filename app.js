@@ -1,5 +1,5 @@
 /* ==========================================================
-    APP.JS - Media Viewer V4.3 Logic (Optimized for One-Handed iPhone 11)
+    APP.JS - Night Edition (Right-Hand Thumb Optimized)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -15,8 +15,6 @@ let mediaUrls = [];
 let workingList = [];
 let currentIndex = 0;
 let searchTimer = null;
-let observer = null;
-let observerTimeout = null;
 let recentHistory = [];
 
 const STORAGE = {
@@ -30,17 +28,11 @@ let heartedItems = new Set();
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
 
-// Auto Play State (Default 2 seconds for snappy hands-free speed)
-let autoPlayActive = false;
-let autoPlayTimer = null;
-let autoPlayInterval = 2000;
-
 /* ==========================================================
-    AUTHENTICATION & INITIALIZATION
+    INIT & AUTH
 ========================================================== */
 function checkPassword(){
     const tokenInput = document.getElementById("passwordInput").value.trim();
-
     if(tokenInput.startsWith("ghp_") || tokenInput.startsWith("github_pat_")){
         GITHUB_CONFIG.token = tokenInput;
         localStorage.setItem("mediaViewerToken", tokenInput);
@@ -48,14 +40,7 @@ function checkPassword(){
         document.getElementById("app").style.display = "block";
         initializeApp();
     } else {
-        document.getElementById("loginError").textContent = "Invalid token format (must start with ghp_ or github_pat_)";
-    }
-}
-
-function logoutGitHub(){
-    if(confirm("Logout and remove saved GitHub token from this device?")){
-        localStorage.removeItem("mediaViewerToken");
-        location.reload();
+        document.getElementById("loginError").textContent = "Invalid token format";
     }
 }
 
@@ -64,11 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pwdInput = document.getElementById("passwordInput");
 
     if(loginBtn) loginBtn.addEventListener("click", checkPassword);
-    if(pwdInput) {
-        pwdInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") checkPassword();
-        });
-    }
+    if(pwdInput) pwdInput.addEventListener("keypress", (e) => { if(e.key === "Enter") checkPassword(); });
 
     if(GITHUB_CONFIG.token){
         document.getElementById("loginScreen").style.display = "none";
@@ -78,20 +59,16 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==========================================================
-    GITHUB API SAVE & LOAD FUNCTIONS
+    GITHUB SYNC
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
         const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
-        const res = await fetch(url, {
-            headers: { Authorization: `token ${GITHUB_CONFIG.token}` }
-        });
+        const res = await fetch(url, { headers: { Authorization: `token ${GITHUB_CONFIG.token}` } });
         if(!res.ok) return null;
         const data = await res.json();
-        const content = JSON.parse(atob(data.content));
-        return { content, sha: data.sha };
+        return { content: JSON.parse(atob(data.content)), sha: data.sha };
     } catch(e) {
-        console.log(`Could not load ${path} from GitHub:`, e);
         return null;
     }
 }
@@ -105,7 +82,7 @@ async function saveGitHubFile(path, dataArray) {
     const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
 
     const body = {
-        message: `Update ${path} from Mobile Viewer`,
+        message: `Update ${path} from Night Viewer`,
         content: contentBase64,
         branch: GITHUB_CONFIG.branch
     };
@@ -113,47 +90,36 @@ async function saveGitHubFile(path, dataArray) {
 
     const res = await fetch(url, {
         method: "PUT",
-        headers: {
-            "Authorization": `token ${GITHUB_CONFIG.token}`,
-            "Content-Type": "application/json"
-        },
+        headers: { "Authorization": `token ${GITHUB_CONFIG.token}`, "Content-Type": "application/json" },
         body: JSON.stringify(body)
     });
-
-    if(!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || `Failed to commit ${path}`);
-    }
+    if(!res.ok) throw new Error(`Failed to save ${path}`);
 }
 
 async function loadServerData(){
     const heartsRes = await fetchGitHubFile("saved_hearts.json");
-    if(heartsRes && Array.isArray(heartsRes.content)) {
-        heartedItems = new Set(heartsRes.content);
-    }
+    if(heartsRes && Array.isArray(heartsRes.content)) heartedItems = new Set(heartsRes.content);
 
     const seenRes = await fetchGitHubFile("seen_media.json");
-    if(seenRes && Array.isArray(seenRes.content)) {
-        seenItems = new Set(seenRes.content);
-    }
+    if(seenRes && Array.isArray(seenRes.content)) seenItems = new Set(seenRes.content);
 
-    updateStatsDashboard();
+    updateStats();
 }
 
 async function manualSyncToGitHub(){
     const statusEl = document.getElementById("status");
-    statusEl.style.color = "#00AAFF";
-    statusEl.textContent = "💾 Saving hearts and seen data to GitHub...";
+    statusEl.style.color = "#38bdf8";
+    statusEl.textContent = "💾 Saving to GitHub...";
 
     try {
         await saveGitHubFile("saved_hearts.json", [...heartedItems]);
         await saveGitHubFile("seen_media.json", [...seenItems]);
-        statusEl.style.color = "#2ecc71";
-        statusEl.textContent = "✅ Successfully saved to GitHub!";
-        setTimeout(() => { statusEl.textContent = ""; }, 4000);
+        statusEl.style.color = "#10b981";
+        statusEl.textContent = "✅ Saved successfully!";
+        setTimeout(() => { statusEl.textContent = ""; }, 3000);
     } catch(error) {
-        statusEl.style.color = "#ff6666";
-        statusEl.textContent = "❌ Failed to save: " + error.message;
+        statusEl.style.color = "#f87171";
+        statusEl.textContent = "❌ Save failed";
     }
 }
 
@@ -163,32 +129,40 @@ function saveSettings(){
 }
 
 /* ==========================================================
-    STATS DASHBOARD
+    STATS & WELCOME
 ========================================================== */
-function updateStatsDashboard(){
+function updateStats(){
     const total = mediaUrls.length;
     const seen = seenItems.size;
     const hearts = heartedItems.size;
-    const remaining = Math.max(0, total - seen);
-    const percentage = total > 0 ? Math.round((seen / total) * 100) : 0;
 
-    const progEl = document.getElementById("statProgress");
     const seenEl = document.getElementById("statSeen");
     const heartsEl = document.getElementById("statHearts");
-    const remEl = document.getElementById("statRemaining");
 
-    if(progEl) progEl.textContent = percentage + "%";
-    if(seenEl) seenEl.textContent = `${seen} / ${total}`;
+    if(seenEl) seenEl.textContent = `${seen}/${total}`;
     if(heartsEl) heartsEl.textContent = hearts;
-    if(remEl) remEl.textContent = remaining;
+
+    // Update Dock Button States
+    const heartBtn = document.getElementById("heartModeBtn");
+    const heartIcon = document.getElementById("heartModeIcon");
+    if(heartBtn && heartIcon){
+        if(heartMode){
+            heartBtn.classList.add("heart-active");
+            heartIcon.textContent = "❤️";
+        } else {
+            heartBtn.classList.remove("heart-active");
+            heartIcon.textContent = "♡";
+        }
+    }
+
+    const swipeBtn = document.getElementById("swipeModeBtn");
+    if(swipeBtn){
+        swipeBtn.style.color = swipeMode ? "#c084fc" : "#ccc";
+    }
 }
 
-/* ==========================================================
-    WELCOME BANNER
-========================================================== */
 function showWelcome(){
-    const visited = localStorage.getItem(STORAGE.visited);
-    if(!visited){
+    if(!localStorage.getItem(STORAGE.visited)){
         const banner = document.getElementById("welcomeBanner");
         if(banner){
             banner.style.display = "block";
@@ -199,10 +173,10 @@ function showWelcome(){
 }
 
 /* ==========================================================
-    MEDIA DETECTION & PRE-LOADING
+    MEDIA UTILS
 ========================================================== */
 function isImage(url){
-    return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com") || url.includes("abs.twimg.com");
+    return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
 }
 
 function isVideo(url){
@@ -217,8 +191,7 @@ function normalizeImageURL(url){
     return src;
 }
 
-function preloadUpcomingMedia(){
-    // Preload next 3 items in background for silky-smooth 1s/2s/3s speed
+function preloadUpcoming(){
     for(let i = currentIndex; i < Math.min(currentIndex + 3, workingList.length); i++){
         const item = workingList[i];
         if(item && isImage(item.url)){
@@ -228,41 +201,13 @@ function preloadUpcomingMedia(){
     }
 }
 
-function createMediaElement(item){
-    let element = null;
-    if(isVideo(item.url)){
-        const video = document.createElement("video");
-        video.src = item.url;
-        video.controls = true;
-        video.playsInline = true;
-        video.preload = "auto";
-        element = video;
-    } else if(isImage(item.url)){
-        const img = document.createElement("img");
-        img.src = normalizeImageURL(item.url);
-        img.loading = "eager";
-        img.decoding = "async";
-        img.onerror = () => { img.style.display = "none"; };
-        element = img;
-    }
-    return element;
-}
-
-/* ==========================================================
-    HELPERS & SCROLL POSITIONING
-========================================================== */
 function snapToTop(){
-    if(swipeMode){
-        // Scroll directly to the top active media container (#number at highest screen position)
-        const activeWrapper = document.querySelector(".media-container");
-        if(activeWrapper){
-            const topPos = activeWrapper.getBoundingClientRect().top + window.pageYOffset - 10;
-            window.scrollTo({ top: Math.max(0, topPos), behavior: "smooth" });
-        } else {
-            window.scrollTo({ top: 0, behavior: "smooth" });
-        }
+    const activeWrapper = document.querySelector(".media-container");
+    if(activeWrapper){
+        const topPos = activeWrapper.getBoundingClientRect().top + window.pageYOffset - 50;
+        window.scrollTo({ top: Math.max(0, topPos), behavior: "smooth" });
     } else {
-        window.scrollTo({ top: 0, behavior: "instant" });
+        window.scrollTo({ top: 0, behavior: "smooth" });
     }
 }
 
@@ -275,7 +220,7 @@ function shuffleArray(array){
 }
 
 /* ==========================================================
-    SEARCH SYSTEM
+    SEARCH
 ========================================================== */
 function applySearch(){
     workingList = buildDisplayList();
@@ -284,66 +229,52 @@ function applySearch(){
     snapToTop();
 }
 
-function debouncedSearch(){
+document.getElementById("searchInput").addEventListener("input", () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(applySearch, SEARCH_DELAY);
-}
+});
 
-const searchInputEl = document.getElementById("searchInput");
-if(searchInputEl) {
-    searchInputEl.addEventListener("input", debouncedSearch);
+function buildDisplayList(){
+    let list = [...mediaUrls];
+    const query = document.getElementById("searchInput").value.toLowerCase().trim();
+
+    if(query){
+        const number = query.replace("#","");
+        list = list.filter(item => item.url.toLowerCase().includes(query) || item.index.toString() === number);
+    } else if(heartMode){
+        list = list.filter(item => heartedItems.has(item.index));
+    } else {
+        list = list.filter(item => !seenItems.has(item.index));
+    }
+    return list;
 }
 
 /* ==========================================================
-    HEART SYSTEM & DOUBLE TAP
+    HEARTS & INTERACTIONS
 ========================================================== */
 function toggleHeart(index){
-    if(heartedItems.has(index)){
-        heartedItems.delete(index);
-    } else {
-        heartedItems.add(index);
-    }
+    if(heartedItems.has(index)) heartedItems.delete(index);
+    else heartedItems.add(index);
 
-    document.querySelectorAll(".heart-btn").forEach(btn => {
-        if(Number(btn.dataset.index) === index){
-            const active = heartedItems.has(index);
-            btn.textContent = active ? "❤️" : "♡";
-            if(active) btn.classList.add("active");
-            else btn.classList.remove("active");
-        }
+    updateStats();
+
+    document.querySelectorAll(`.heart-toggle-${index}`).forEach(el => {
+        el.textContent = heartedItems.has(index) ? "❤️" : "♡";
     });
 
-    document.querySelectorAll(".swipe-action-btn").forEach(btn => {
-        if(btn.dataset.index == index) {
-            btn.textContent = heartedItems.has(index) ? "❤️ Unheart" : "❤️ Heart";
-        }
-    });
-
-    updateStatsDashboard();
-
-    if(heartMode && !heartedItems.has(index)){
-        applySearch();
-    }
-
-    if(swipeMode && heartedItems.has(index)){
-        setTimeout(() => {
-            nextRandomPage();
-        }, 350);
-    }
+    if(heartMode && !heartedItems.has(index)) applySearch();
 }
 
 function handleDoubleTap(itemIndex, wrapperElement) {
     toggleHeart(itemIndex);
+    const existing = wrapperElement.querySelector(".floating-heart");
+    if(existing) existing.remove();
 
-    const existingHeart = wrapperElement.querySelector(".floating-heart");
-    if(existingHeart) existingHeart.remove();
-
-    const heartPop = document.createElement("div");
-    heartPop.className = "floating-heart";
-    heartPop.textContent = "❤️";
-    wrapperElement.appendChild(heartPop);
-
-    setTimeout(() => { heartPop.remove(); }, 600);
+    const pop = document.createElement("div");
+    pop.className = "floating-heart";
+    pop.textContent = "❤️";
+    wrapperElement.appendChild(pop);
+    setTimeout(() => pop.remove(), 500);
 }
 
 function showHeartedOnly(){
@@ -365,39 +296,7 @@ function toggleSwipeMode(){
 }
 
 /* ==========================================================
-    AUTO PLAY SYSTEM
-========================================================== */
-function toggleAutoPlay(){
-    autoPlayActive = !autoPlayActive;
-    if(autoPlayActive){
-        startAutoPlayTimer();
-    } else {
-        stopAutoPlayTimer();
-    }
-    renderControls();
-}
-
-function startAutoPlayTimer(){
-    stopAutoPlayTimer();
-    autoPlayTimer = setInterval(() => {
-        nextRandomPage();
-    }, autoPlayInterval);
-}
-
-function stopAutoPlayTimer(){
-    if(autoPlayTimer) clearInterval(autoPlayTimer);
-    autoPlayTimer = null;
-}
-
-function changeAutoPlaySpeed(val){
-    autoPlayInterval = Number(val);
-    if(autoPlayActive){
-        startAutoPlayTimer();
-    }
-}
-
-/* ==========================================================
-    RECENTLY VIEWED HISTORY DRAWER WITH THUMBNAILS
+    HISTORY DRAWER
 ========================================================== */
 function addToHistory(item){
     recentHistory = recentHistory.filter(i => i.index !== item.index);
@@ -407,223 +306,64 @@ function addToHistory(item){
 
 function toggleHistoryModal(){
     const modal = document.getElementById("historyModal");
-    if(modal){
-        modal.classList.toggle("hidden");
-        if(!modal.classList.contains("hidden")){
-            renderHistoryList();
-        }
-    }
+    modal.classList.toggle("hidden");
+    if(!modal.classList.contains("hidden")) renderHistory();
 }
 
-function renderHistoryList(){
+function renderHistory(){
     const container = document.getElementById("historyListContainer");
-    if(!container) return;
-
     if(recentHistory.length === 0){
-        container.innerHTML = '<p style="color:#777; text-align:center;">No recent history yet.</p>';
+        container.innerHTML = '<p style="color:#555; text-align:center;">No history yet</p>';
         return;
     }
-
-    container.innerHTML = recentHistory.map(item => {
-        const thumbUrl = normalizeImageURL(item.url);
-        const hasThumb = isImage(item.url);
-        return `
-            <div class="history-item" onclick="jumpToHistoryItem(${item.index})">
-                ${hasThumb ? `<img src="${thumbUrl}" style="width:42px; height:42px; object-fit:cover; border-radius:6px; margin-right:12px; background:#000;" onerror="this.style.display='none'">` : `<div style="width:42px; height:42px; background:#222; border-radius:6px; margin-right:12px; display:flex; align-items:center; justify-content:center; font-size:16px;">🎬</div>`}
-                <div style="font-size:15px; margin-right:12px; font-weight:bold; min-width:45px;">#${item.index}</div>
-                <div style="font-size:11px; color:#aaa; word-break:break-all; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.url}</div>
-                <div style="font-size:16px; margin-left:10px;">${heartedItems.has(item.index) ? "❤️" : ""}</div>
-            </div>
-        `;
-    }).join("");
+    container.innerHTML = recentHistory.map(item => `
+        <div class="history-item" onclick="jumpToHistory(${item.index})">
+            <div style="font-weight:bold; margin-right:12px; min-width:45px; color:#aaa;">#${item.index}</div>
+            <div style="font-size:11px; color:#666; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.url}</div>
+            <div>${heartedItems.has(item.index) ? "❤️" : ""}</div>
+        </div>
+    `).join("");
 }
 
-function jumpToHistoryItem(index){
+function jumpToHistory(index){
     toggleHistoryModal();
-    const foundIndex = workingList.findIndex(item => item.index === index);
-    if(foundIndex !== -1){
-        currentIndex = foundIndex;
-    } else {
+    const found = workingList.findIndex(i => i.index === index);
+    if(found !== -1) currentIndex = found;
+    else {
         const item = mediaUrls.find(i => i.index === index);
-        if(item){
-            workingList.unshift(item);
-            currentIndex = 0;
-        }
+        if(item) { workingList.unshift(item); currentIndex = 0; }
     }
     render();
     snapToTop();
 }
 
-async function clearAllData(){
-    if(!confirm("Clear all hearts and seen media history locally and on GitHub?")) return;
-
-    heartedItems.clear();
-    seenItems.clear();
-    recentHistory = [];
-
-    document.querySelectorAll(".heart-btn").forEach(btn => {
-        btn.textContent = "♡";
-        btn.classList.remove("active");
-    });
-
-    applySearch();
-
-    const statusEl = document.getElementById("status");
-    if(statusEl) {
-        statusEl.style.color = "#00AAFF";
-        statusEl.textContent = "🗑 Clearing data on GitHub...";
-    }
-
-    try {
-        await saveGitHubFile("saved_hearts.json", []);
-        await saveGitHubFile("seen_media.json", []);
-        if(statusEl) {
-            statusEl.style.color = "#2ecc71";
-            statusEl.textContent = "✅ Successfully cleared and saved to GitHub!";
-            setTimeout(() => { statusEl.textContent = ""; }, 4000);
-        }
-    } catch(error) {
-        if(statusEl) {
-            statusEl.style.color = "#ff6666";
-            statusEl.textContent = "❌ Failed to clear on GitHub: " + error.message;
-        }
-    }
-}
-
 /* ==========================================================
-    BUILD DISPLAY LIST
+    RENDER
 ========================================================== */
-function buildDisplayList(){
-    let list = [...mediaUrls];
-    const queryEl = document.getElementById("searchInput");
-    const query = queryEl ? queryEl.value.toLowerCase().trim() : "";
-
-    if(query){
-        const number = query.replace("#","");
-        list = list.filter(item => item.url.toLowerCase().includes(query) || item.index.toString() === number);
-    } else if(heartMode){
-        list = list.filter(item => heartedItems.has(item.index));
-    } else {
-        list = list.filter(item => !seenItems.has(item.index));
-    }
-
-    return list;
-}
-
-/* ==========================================================
-    TRACK SEEN MEDIA WITH INTERSECTION
-========================================================== */
-function setupObserver(){
-    if(observer) observer.disconnect();
-    if(observerTimeout) clearTimeout(observerTimeout);
-
-    observerTimeout = setTimeout(() => {
-        observer = new IntersectionObserver((entries, obs) => {
-            entries.forEach(entry => {
-                if(entry.isIntersecting){
-                    const index = Number(entry.target.dataset.index);
-                    if(index && !heartMode && !seenItems.has(index)){
-                        seenItems.add(index);
-                        updateStatsDashboard();
-
-                        const numberEl = document.getElementById(`num-${index}`);
-                        if(numberEl && !numberEl.querySelector(".seen-badge")) {
-                            const badge = document.createElement("span");
-                            badge.className = "seen-badge";
-                            badge.style.marginLeft = "6px";
-                            badge.textContent = "👀 Seen";
-                            numberEl.appendChild(badge);
-                        }
-
-                        obs.unobserve(entry.target);
-                    }
-                }
-            });
-        }, { threshold: 0.5 });
-
-        document.querySelectorAll(".media-container").forEach(wrapper => {
-            observer.observe(wrapper);
-        });
-    }, 1500);
-}
-
-/* ==========================================================
-    RENDER SYSTEM
-========================================================== */
-function renderControls(){
-    const html = `
-        <div style="display:flex; justify-content:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
-            <button class="heart-mode-btn" onclick="showHeartedOnly()">${heartMode ? "❤️ Hearts" : "♡ Hearts"}</button>
-            <button class="swipe-mode-btn" onclick="toggleSwipeMode()" style="background:${swipeMode ? '#d35400' : '#2980b9'}">${swipeMode ? "🎴 Swipe: ON" : "🎴 Swipe: OFF"}</button>
-            <button class="history-btn" onclick="toggleHistoryModal()">🕒 History</button>
-            <button class="random-btn" onclick="nextRandomPage()">🎲 Random</button>
-        </div>
-        <div style="display:flex; justify-content:center; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
-            <button class="autoplay-btn" onclick="toggleAutoPlay()" style="background:${autoPlayActive ? '#c0392b' : '#16a085'}">${autoPlayActive ? '⏹️ Stop Auto' : '▶️ Auto Play'}</button>
-            <select onchange="changeAutoPlaySpeed(this.value)" style="padding:8px 10px; border-radius:6px; background:#222; color:#fff; border:1px solid #444; font-size:13px;">
-                <option value="1000" ${autoPlayInterval === 1000 ? 'selected' : ''}>1s (Fast)</option>
-                <option value="2000" ${autoPlayInterval === 2000 ? 'selected' : ''}>2s</option>
-                <option value="3000" ${autoPlayInterval === 3000 ? 'selected' : ''}>3s</option>
-                <option value="5000" ${autoPlayInterval === 5000 ? 'selected' : ''}>5s</option>
-                <option value="8000" ${autoPlayInterval === 8000 ? 'selected' : ''}>8s</option>
-                <option value="12000" ${autoPlayInterval === 12000 ? 'selected' : ''}>12s</option>
-            </select>
-            <button class="sync-btn" onclick="manualSyncToGitHub()">💾 Save</button>
-        </div>
-    `;
-    const topC = document.getElementById("topControls");
-    const botC = document.getElementById("bottomControls");
-    if(topC) topC.innerHTML = html;
-    if(botC) botC.innerHTML = html;
-}
-
 function render(){
-    renderControls();
-    updateStatsDashboard();
-    preloadUpcomingMedia();
+    updateStats();
+    preloadUpcoming();
 
     const container = document.getElementById("mediaContainer");
-    if(!container) return;
     container.innerHTML = "";
+    document.getElementById("status").textContent = "";
 
-    const statusEl = document.getElementById("status");
-    if(statusEl) statusEl.textContent = "";
-
-    const pageSize = swipeMode ? 1 : 15;
+    const pageSize = swipeMode ? 1 : 12;
     let shown = 0;
-    let lastTapTime = 0;
+    let lastTap = 0;
 
     while(shown < pageSize && currentIndex < workingList.length){
         const item = workingList[currentIndex];
         currentIndex++;
-
         addToHistory(item);
 
         const wrapper = document.createElement("div");
         wrapper.className = "media-container";
-        wrapper.dataset.index = item.index;
 
-        const number = document.createElement("div");
-        number.className = "media-number";
-        number.id = `num-${item.index}`;
-        number.textContent = "#" + item.index;
-
-        if(!heartMode && seenItems.has(item.index)){
-            number.innerHTML += ' <span class="seen-badge" style="margin-left:6px;">👀 Seen</span>';
-        }
-
-        wrapper.appendChild(number);
-
-        const heart = document.createElement("button");
-        heart.className = "heart-btn";
-        heart.dataset.index = item.index;
-
-        const isHearted = heartedItems.has(item.index);
-        heart.textContent = isHearted ? "❤️" : "♡";
-        if(isHearted) heart.classList.add("active");
-
-        heart.onclick = () => toggleHeart(item.index);
-        wrapper.appendChild(heart);
+        const numEl = document.createElement("div");
+        numEl.className = "media-number";
+        numEl.innerHTML = `#${item.index} ${(!heartMode && seenItems.has(item.index)) ? '<span class="seen-badge">Seen</span>' : ''}`;
+        wrapper.appendChild(numEl);
 
         const link = document.createElement("a");
         link.href = item.url;
@@ -631,119 +371,89 @@ function render(){
         link.textContent = item.url;
         wrapper.appendChild(link);
 
-        const media = createMediaElement(item);
-        if(media) {
-            media.addEventListener("click", (e) => {
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTapTime;
-                if (tapLength < 300 && tapLength > 0) {
-                    e.preventDefault();
-                    handleDoubleTap(item.index, wrapper);
-                }
-                lastTapTime = currentTime;
+        let media;
+        if(isVideo(item.url)){
+            media = document.createElement("video");
+            media.src = item.url;
+            media.controls = true;
+            media.playsInline = true;
+        } else if(isImage(item.url)){
+            media = document.createElement("img");
+            media.src = normalizeImageURL(item.url);
+            media.loading = "eager";
+        }
+
+        if(media){
+            media.addEventListener("click", () => {
+                const now = Date.now();
+                if(now - lastTap < 300) handleDoubleTap(item.index, wrapper);
+                lastTap = now;
             });
             wrapper.appendChild(media);
         }
 
+        // Swipe mode instant seen tracking
+        if(swipeMode && !heartMode && !seenItems.has(item.index)){
+            seenItems.add(item.index);
+            updateStats();
+        }
+
+        // Swipe gestures
         if(swipeMode){
-            const swipeActions = document.createElement("div");
-            swipeActions.className = "swipe-actions";
-            swipeActions.innerHTML = `
-                <button class="swipe-action-btn" style="background:#7f8c8d;" onclick="nextRandomPage()">⏭️ Skip</button>
-                <button class="swipe-action-btn" data-index="${item.index}" style="background:#e91e63;" onclick="toggleHeart(${item.index})">${heartedItems.has(item.index) ? "❤️ Unheart" : "❤️ Heart"}</button>
-            `;
-            wrapper.appendChild(swipeActions);
-
-            // Mark as seen immediately in swipe mode regardless of time spent
-            if(!heartMode && !seenItems.has(item.index)){
-                seenItems.add(item.index);
-                updateStatsDashboard();
-            }
-
-            let touchStartX = 0;
-            let touchEndX = 0;
-
-            wrapper.addEventListener("touchstart", (e) => {
-                if(e.touches.length === 1) {
-                    touchStartX = e.changedTouches[0].screenX;
+            let startX = 0;
+            wrapper.addEventListener("touchstart", e => { startX = e.touches[0].clientX; }, {passive:true});
+            wrapper.addEventListener("touchend", e => {
+                const diff = e.changedTouches[0].clientX - startX;
+                if(Math.abs(diff) > 60){
+                    if(diff < 0) nextRandomPage();
+                    else toggleHeart(item.index);
                 }
-            }, {passive: true});
-
-            wrapper.addEventListener("touchend", (e) => {
-                if(e.changedTouches.length === 1) {
-                    touchEndX = e.changedTouches[0].screenX;
-                    const diff = touchEndX - touchStartX;
-                    if (Math.abs(diff) > 70) {
-                        if (diff < 0) {
-                            nextRandomPage();
-                        } else {
-                            toggleHeart(item.index);
-                        }
-                    }
-                }
-            }, {passive: true});
+            }, {passive:true});
         }
 
         container.appendChild(wrapper);
         shown++;
     }
-
-    if(!swipeMode){
-        setupObserver();
-    }
 }
 
-/* ==========================================================
-    RANDOM PAGE SYSTEM
-========================================================== */
 function nextRandomPage(){
     snapToTop();
-
     if(heartMode){
         if(currentIndex >= workingList.length){
             shuffleArray(workingList);
             currentIndex = 0;
-            const statusEl = document.getElementById("status");
-            if(statusEl) statusEl.textContent = "❤️ All hearts viewed! Reshuffling hearts.";
         }
     } else {
         workingList = buildDisplayList();
         shuffleArray(workingList);
         currentIndex = 0;
-
         if(workingList.length === 0){
             seenItems.clear();
             workingList = buildDisplayList();
             shuffleArray(workingList);
-            const statusEl = document.getElementById("status");
-            if(statusEl) statusEl.textContent = "🎉 Cycle complete. Starting again.";
         }
     }
-
     render();
 }
 
 /* ==========================================================
-    START APPLICATION
+    INITIALIZE
 ========================================================== */
 async function initializeApp(){
     try {
-        const response = await fetch("mediaNEW.json?t=" + new Date().getTime());
-        if(!response.ok) throw new Error("Could not load mediaNEW.json");
-        const data = await response.json();
+        const res = await fetch("mediaNEW.json?t=" + Date.now());
+        if(!res.ok) throw new Error("Failed to load mediaNEW.json");
+        const data = await res.json();
 
-        mediaUrls = data.map((url, index) => ({ url: url, index: index + 1 }));
-
+        mediaUrls = data.map((url, i) => ({ url, index: i + 1 }));
         await loadServerData();
         showWelcome();
 
         workingList = buildDisplayList();
         shuffleArray(workingList);
-
         currentIndex = 0;
         render();
-    } catch(error) {
-        const statusEl = document.getElementById("status");
-        if(statusEl) statusEl.textContent = "Error: " + error.message;
+    } catch(e) {
+        document.getElementById("status").textContent = "Error: " + e.message;
     }
 }
