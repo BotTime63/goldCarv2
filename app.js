@@ -1,5 +1,5 @@
 /* ==========================================================
-    APP.JS - Night Edition V5 (Turbocharged & Fully Refined)
+    APP.JS - Night Edition V6 (Save Button Restored)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -205,7 +205,6 @@ function normalizeImageURL(url){
 }
 
 function preloadUpcoming(){
-    // Turbocharged preloading: Preload the next 8 items ahead in background for zero lag
     for(let i = currentIndex; i < Math.min(currentIndex + 8, workingList.length); i++){
         const item = workingList[i];
         if(item && isImage(item.url)){
@@ -511,7 +510,6 @@ function render(){
             wrapper.appendChild(media);
         }
 
-        // Swipe mode instant seen tracking & badge
         if(swipeMode && !heartMode && !seenItems.has(item.index)){
             seenItems.add(item.index);
             updateStats();
@@ -521,7 +519,6 @@ function render(){
             numEl.appendChild(badge);
         }
 
-        // Swipe gestures
         if(swipeMode){
             let startX = 0;
             wrapper.addEventListener("touchstart", e => { startX = e.touches[0].clientX; }, {passive:true});
