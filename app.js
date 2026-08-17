@@ -22,6 +22,7 @@ let observerTimeout = null;
 const STORAGE = {
     heartMode: "mediaViewerHeartMode",
     swipeMode: "mediaViewerSwipeMode",
+    maxScreen: "mediaViewerMaxScreen",
     visited: "mediaViewerVisited"
 };
 
@@ -29,6 +30,7 @@ let seenItems = new Set();
 let heartedItems = new Set();
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
+let maxScreenGlobal = localStorage.getItem(STORAGE.maxScreen) === "true";
 
 // Auto Play State
 let autoPlayActive = false;
@@ -131,7 +133,7 @@ async function manualSyncToGitHub(){
 }
 
 /* ==========================================================
-   CLEAR BUTTON FUNCTIONALITY (Simplified Confirmation)
+   CLEAR BUTTON FUNCTIONALITY
 ========================================================== */
 async function confirmClearData() {
     const firstCheck = confirm("⚠️ DANGER: Are you sure you want to completely reset seen_media.json and saved_hearts.json?");
@@ -148,6 +150,7 @@ async function confirmClearData() {
 function saveSettings(){
     localStorage.setItem(STORAGE.heartMode, heartMode.toString());
     localStorage.setItem(STORAGE.swipeMode, swipeMode.toString());
+    localStorage.setItem(STORAGE.maxScreen, maxScreenGlobal.toString());
 }
 
 /* ==========================================================
@@ -179,6 +182,20 @@ function updateStats(){
     const swipeBtn = document.getElementById("swipeModeBtn");
     if(swipeBtn){
         swipeBtn.style.color = swipeMode ? "#c084fc" : "#ccc";
+    }
+
+    const maxDockBtn = document.getElementById("maxScreenDockBtn");
+    const maxIcon = document.getElementById("maxScreenIcon");
+    if(maxDockBtn && maxIcon){
+        if(maxScreenGlobal){
+            maxDockBtn.classList.add("max-active");
+            maxIcon.textContent = "🔲";
+            document.body.classList.add("max-screen-global");
+        } else {
+            maxDockBtn.classList.remove("max-active");
+            maxIcon.textContent = "↔️";
+            document.body.classList.remove("max-screen-global");
+        }
     }
 
     const autoIcon = document.getElementById("autoPlayIcon");
@@ -363,6 +380,12 @@ function showHeartedOnly(){
     snapToTop();
 }
 
+function toggleGlobalMaxScreen(){
+    maxScreenGlobal = !maxScreenGlobal;
+    saveSettings();
+    updateStats();
+}
+
 function toggleSwipeMode(){
     swipeMode = !swipeMode;
     saveSettings();
@@ -491,7 +514,7 @@ function render(){
         }
         wrapper.appendChild(numEl);
 
-        // Actions Row (Heart + Max Screen Toggle Button)
+        // Actions Row (Heart Button)
         const actionsRow = document.createElement("div");
         actionsRow.className = "media-actions-row";
 
@@ -501,23 +524,6 @@ function render(){
         heartBtn.textContent = heartedItems.has(item.index) ? "❤️" : "♡";
         heartBtn.onclick = () => toggleHeart(item.index, swipeMode);
         actionsRow.appendChild(heartBtn);
-
-        const maxScreenBtn = document.createElement("button");
-        maxScreenBtn.className = "max-screen-btn";
-        maxScreenBtn.innerHTML = "↔️ Max Screen";
-        maxScreenBtn.onclick = () => {
-            wrapper.classList.toggle("max-screen");
-            if(wrapper.classList.contains("max-screen")){
-                maxScreenBtn.innerHTML = "🔲 Normal Fit";
-                maxScreenBtn.style.background = "rgba(147, 51, 234, 0.25)";
-                maxScreenBtn.style.borderColor = "#9333ea";
-            } else {
-                maxScreenBtn.innerHTML = "↔️ Max Screen";
-                maxScreenBtn.style.background = "";
-                maxScreenBtn.style.borderColor = "";
-            }
-        };
-        actionsRow.appendChild(maxScreenBtn);
 
         wrapper.appendChild(actionsRow);
 
