@@ -1,5 +1,5 @@
 /* ==========================================================
-   APP.JS - Night Edition V7 (Smart iPhone 11 / Right-Hand UI)
+   APP.JS - Night Edition V8 (Smart iPhone 11 / Right-Hand UI)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -131,13 +131,19 @@ async function manualSyncToGitHub(){
 }
 
 /* ==========================================================
-   CLEAR BUTTON FUNCTIONALITY
+   SETTINGS & CLEAR DATA FUNCTIONALITY
 ========================================================== */
+function toggleSettingsModal() {
+    const modal = document.getElementById("settingsModal");
+    modal.classList.toggle("hidden");
+}
+
 async function confirmClearData() {
     if(confirm("Are you sure you want to reset seen_media.json and saved_hearts.json?")) {
         seenItems.clear();
         heartedItems.clear();
         updateStats();
+        toggleSettingsModal();
         await manualSyncToGitHub();
         applySearch();
     }
@@ -220,36 +226,28 @@ function normalizeImageURL(url){
 async function saveToCameraRoll(url, index) {
     const statusEl = document.getElementById("status");
     statusEl.style.color = "#38bdf8";
-    statusEl.textContent = `📥 Preparing media #${index}...`;
+    statusEl.textContent = `📥 Saving media #${index}...`;
 
     try {
         const absoluteUrl = normalizeImageURL(url);
         const response = await fetch(absoluteUrl, { mode: 'cors' });
         const blob = await response.blob();
         const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
-        const file = new File([blob], `media_${index}.${fileExtension}`, { type: blob.type });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: `Media #${index}`,
-            });
-            statusEl.textContent = "";
-        } else {
-            // Fallback for browsers without direct file sharing
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = `media_${index}.${fileExtension}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            statusEl.style.color = "#10b981";
-            statusEl.textContent = `✅ Saved! Check your downloads/photos.`;
-            setTimeout(() => { statusEl.textContent = ""; }, 3000);
-        }
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // Single-tap direct download action trigger
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `media_${index}.${fileExtension}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        statusEl.style.color = "#10b981";
+        statusEl.textContent = `✅ Saved media #${index}!`;
+        setTimeout(() => { statusEl.textContent = ""; }, 3000);
     } catch (err) {
-        // If sharing fails/cancelled, open directly as fallback
+        // Fallback open if CORS restrictions apply
         window.open(normalizeImageURL(url), '_blank');
         statusEl.textContent = "";
     }
@@ -357,7 +355,8 @@ function changeAutoPlaySpeed(val){
    HEARTS & INTERACTIONS
 ========================================================== */
 function toggleHeart(index, autoAdvance = false){
-    if(heartedItems.has(index)) heartedItems.delete(index);
+    const isHearted = heartedItems.has(index);
+    if(isHearted) heartedItems.delete(index);
     else heartedItems.add(index);
 
     updateStats();
@@ -406,6 +405,54 @@ function toggleSwipeMode(){
     currentIndex = 0;
     render();
     snapToTop();
+}
+
+/* ==========================================================
+   SWIPE GESTURE CONTROLS (Swipe Right = Heart + Next, Swipe Left = Skip)
+========================================================== */
+function attachSwipeGestures(wrapperElement, itemIndex) {
+    let startX = 0;
+    let startY = 0;
+    let distX = 0;
+    let distY = 0;
+    const threshold = 70; // minimum distance for swipe
+
+    wrapperElement.addEventListener("touchstart", (e) => {
+        if (!swipeMode) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    wrapperElement.addEventListener("touchmove", (e) => {
+        if (!swipeMode) return;
+        distX = e.touches[0].clientX - startX;
+        distY = e.touches[0].clientY - startY;
+        
+        // If swiping horizontally more than vertically, provide slight smooth feedback
+        if (Math.abs(distX) > Math.abs(distY) && Math.abs(distX) < 150) {
+            wrapperElement.style.transform = `translateX(${distX * 0.4}px) rotate(${distX * 0.03}deg)`;
+        }
+    }, { passive: true });
+
+    wrapperElement.addEventListener("touchend", () => {
+        if (!swipeMode) return;
+        wrapperElement.style.transform = "";
+
+        if (Math.abs(distX) > threshold && Math.abs(distX) > Math.abs(distY)) {
+            if (distX > 0) {
+                // Swipe RIGHT -> Heart & Advance
+                if (!heartedItems.has(itemIndex)) {
+                    toggleHeart(itemIndex, false);
+                }
+                nextRandomPage();
+            } else {
+                // Swipe LEFT -> Skip without heart
+                nextRandomPage();
+            }
+        }
+        distX = 0;
+        distY = 0;
+    }, { passive: true });
 }
 
 /* ==========================================================
@@ -508,11 +555,16 @@ function render(){
     while(shown < pageSize && currentIndex < workingList.length){
         const item = workingList[currentIndex];
         currentIndex++;
+        shown++;
         addToHistory(item);
 
         const wrapper = document.createElement("div");
         wrapper.className = "media-container";
         wrapper.dataset.index = item.index;
+
+        if (swipeMode) {
+            attachSwipeGestures(wrapper, item.index);
+        }
 
         const numEl = document.createElement("div");
         numEl.className = "media-number";
@@ -579,88 +631,33 @@ function render(){
             innerWrapper.appendChild(media);
         }
         wrapper.appendChild(innerWrapper);
-
-        if(swipeMode && !heartMode && !seenItems.has(item.index)){
-            seenItems.add(item.index);
-            updateStats();
-            const badge = document.createElement("span");
-            badge.className = "seen-badge";
-            badge.textContent = "👀 Seen";
-            numEl.appendChild(badge);
-        }
-
-        if(swipeMode){
-            let startX = 0;
-            let startY = 0;
-            wrapper.addEventListener("touchstart", e => { 
-                startX = e.touches[0].clientX; 
-                startY = e.touches[0].clientY; 
-            }, {passive:true});
-
-            wrapper.addEventListener("touchend", e => {
-                const diffX = e.changedTouches[0].clientX - startX;
-                const diffY = e.changedTouches[0].clientY - startY;
-                
-                // Ensure it's a horizontal swipe rather than vertical scrolling or zooming
-                if(Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)){
-                    if(diffX < 0) {
-                        // Swipe left = Skip / No heart
-                        nextRandomPage();
-                    } else {
-                        // Swipe right = Heart + Auto advance
-                        toggleHeart(item.index, true);
-                    }
-                }
-            }, {passive:true});
-        }
-
         container.appendChild(wrapper);
-        shown++;
     }
 
-    if(!swipeMode){
-        setupObserver();
+    if(currentIndex >= workingList.length && workingList.length > 0){
+        currentIndex = 0; // Loop list cleanly
     }
+
+    setupObserver();
 }
 
 function nextRandomPage(){
-    snapToTop();
-    if(heartMode){
-        if(currentIndex >= workingList.length){
-            shuffleArray(workingList);
-            currentIndex = 0;
-        }
-    } else {
-        workingList = buildDisplayList();
-        shuffleArray(workingList);
-        currentIndex = 0;
-        if(workingList.length === 0){
-            seenItems.clear();
-            workingList = buildDisplayList();
-            shuffleArray(workingList);
-        }
-    }
     render();
+    snapToTop();
 }
 
-/* ==========================================================
-   INITIALIZE
-========================================================== */
-async function initializeApp(){
-    try {
-        const res = await fetch("mediaNEW.json?t=" + Date.now());
-        if(!res.ok) throw new Error("Failed to load mediaNEW.json");
-        const data = await res.json();
-        
-        mediaUrls = data.map((url, i) => ({ url, index: i + 1 }));
-        await loadServerData();
-        showWelcome();
-
-        workingList = buildDisplayList();
-        shuffleArray(workingList);
-        currentIndex = 0;
-        render();
-    } catch(e) {
-        document.getElementById("status").textContent = "Error: " + e.message;
-    }
+function initializeApp(){
+    fetchGitHubFile("media_urls.json").then(res => {
+        if(res && Array.isArray(res.content)){
+            mediaUrls = res.content.map((url, idx) => ({ index: idx + 1, url }));
+            loadServerData().then(() => {
+                workingList = buildDisplayList();
+                if(!heartMode) shuffleArray(workingList);
+                render();
+                showWelcome();
+            });
+        } else {
+            document.getElementById("status").textContent = "❌ Failed to load media_urls.json from GitHub repository.";
+        }
+    });
 }
