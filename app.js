@@ -1,5 +1,5 @@
 /* ==========================================================
-    APP.JS - Night Edition V6 (Save Button Restored)
+   APP.JS - Night Edition V7 (Smart iPhone 11 / Right-Hand UI)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -36,7 +36,7 @@ let autoPlayTimer = null;
 let autoPlayInterval = 2500;
 
 /* ==========================================================
-    INIT & AUTH
+   INIT & AUTH
 ========================================================== */
 function checkPassword(){
     const tokenInput = document.getElementById("passwordInput").value.trim();
@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==========================================================
-    GITHUB SYNC
+   GITHUB SYNC
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
@@ -130,13 +130,26 @@ async function manualSyncToGitHub(){
     }
 }
 
+/* ==========================================================
+   CLEAR BUTTON FUNCTIONALITY
+========================================================== */
+async function confirmClearData() {
+    if(confirm("Are you sure you want to reset seen_media.json and saved_hearts.json?")) {
+        seenItems.clear();
+        heartedItems.clear();
+        updateStats();
+        await manualSyncToGitHub();
+        applySearch();
+    }
+}
+
 function saveSettings(){
     localStorage.setItem(STORAGE.heartMode, heartMode.toString());
     localStorage.setItem(STORAGE.swipeMode, swipeMode.toString());
 }
 
 /* ==========================================================
-    STATS & WELCOME
+   STATS & WELCOME
 ========================================================== */
 function updateStats(){
     const total = mediaUrls.length;
@@ -186,7 +199,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-    MEDIA UTILS & TURBO PRELOADING
+   MEDIA UTILS & CAMERA ROLL DOWNLOAD
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
@@ -202,6 +215,44 @@ function normalizeImageURL(url){
         src = src.replace("imgur.com/", "i.imgur.com/") + ".jpg";
     }
     return src;
+}
+
+async function saveToCameraRoll(url, index) {
+    const statusEl = document.getElementById("status");
+    statusEl.style.color = "#38bdf8";
+    statusEl.textContent = `📥 Preparing media #${index}...`;
+
+    try {
+        const absoluteUrl = normalizeImageURL(url);
+        const response = await fetch(absoluteUrl, { mode: 'cors' });
+        const blob = await response.blob();
+        const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
+        const file = new File([blob], `media_${index}.${fileExtension}`, { type: blob.type });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: `Media #${index}`,
+            });
+            statusEl.textContent = "";
+        } else {
+            // Fallback for browsers without direct file sharing
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `media_${index}.${fileExtension}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            statusEl.style.color = "#10b981";
+            statusEl.textContent = `✅ Saved! Check your downloads/photos.`;
+            setTimeout(() => { statusEl.textContent = ""; }, 3000);
+        }
+    } catch (err) {
+        // If sharing fails/cancelled, open directly as fallback
+        window.open(normalizeImageURL(url), '_blank');
+        statusEl.textContent = "";
+    }
 }
 
 function preloadUpcoming(){
@@ -237,7 +288,7 @@ function shuffleArray(array){
 }
 
 /* ==========================================================
-    SEARCH
+   SEARCH
 ========================================================== */
 function applySearch(){
     workingList = buildDisplayList();
@@ -267,7 +318,7 @@ function buildDisplayList(){
 }
 
 /* ==========================================================
-    AUTO PLAY SYSTEM
+   AUTO PLAY SYSTEM
 ========================================================== */
 function toggleAutoPlay(){
     autoPlayActive = !autoPlayActive;
@@ -303,9 +354,9 @@ function changeAutoPlaySpeed(val){
 }
 
 /* ==========================================================
-    HEARTS & INTERACTIONS
+   HEARTS & INTERACTIONS
 ========================================================== */
-function toggleHeart(index){
+function toggleHeart(index, autoAdvance = false){
     if(heartedItems.has(index)) heartedItems.delete(index);
     else heartedItems.add(index);
 
@@ -321,10 +372,13 @@ function toggleHeart(index){
     });
 
     if(heartMode && !heartedItems.has(index)) applySearch();
+    if(autoAdvance && swipeMode) {
+        setTimeout(nextRandomPage, 150);
+    }
 }
 
 function handleDoubleTap(itemIndex, wrapperElement) {
-    toggleHeart(itemIndex);
+    toggleHeart(itemIndex, true);
     const existing = wrapperElement.querySelector(".floating-heart");
     if(existing) existing.remove();
 
@@ -355,7 +409,7 @@ function toggleSwipeMode(){
 }
 
 /* ==========================================================
-    HISTORY DRAWER WITH THUMBNAILS
+   HISTORY DRAWER WITH THUMBNAILS
 ========================================================== */
 function addToHistory(item){
     recentHistory = recentHistory.filter(i => i.index !== item.index);
@@ -402,7 +456,7 @@ function jumpToHistory(index){
 }
 
 /* ==========================================================
-    INTERSECTION OBSERVER (SEEN BADGE POP)
+   INTERSECTION OBSERVER (SEEN BADGE POP)
 ========================================================== */
 function setupObserver(){
     if(observer) observer.disconnect();
@@ -437,7 +491,7 @@ function setupObserver(){
 }
 
 /* ==========================================================
-    RENDER
+   RENDER
 ========================================================== */
 function render(){
     updateStats();
@@ -473,18 +527,33 @@ function render(){
         }
         wrapper.appendChild(numEl);
 
+        // Actions Row (Heart + Camera Roll Save Button)
+        const actionsRow = document.createElement("div");
+        actionsRow.className = "media-actions-row";
+
         const heartBtn = document.createElement("button");
         heartBtn.className = `heart-btn ${heartedItems.has(item.index) ? 'active' : ''}`;
         heartBtn.dataset.index = item.index;
         heartBtn.textContent = heartedItems.has(item.index) ? "❤️" : "♡";
-        heartBtn.onclick = () => toggleHeart(item.index);
-        wrapper.appendChild(heartBtn);
+        heartBtn.onclick = () => toggleHeart(item.index, swipeMode);
+        actionsRow.appendChild(heartBtn);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "save-camera-btn";
+        saveBtn.innerHTML = "📥 Save to Photos";
+        saveBtn.onclick = () => saveToCameraRoll(item.url, item.index);
+        actionsRow.appendChild(saveBtn);
+
+        wrapper.appendChild(actionsRow);
 
         const link = document.createElement("a");
         link.href = item.url;
         link.target = "_blank";
         link.textContent = item.url;
         wrapper.appendChild(link);
+
+        const innerWrapper = document.createElement("div");
+        innerWrapper.className = "media-wrapper-inner";
 
         let media;
         if(isVideo(item.url)){
@@ -507,8 +576,9 @@ function render(){
                 if(now - lastTap < 300) handleDoubleTap(item.index, wrapper);
                 lastTap = now;
             });
-            wrapper.appendChild(media);
+            innerWrapper.appendChild(media);
         }
+        wrapper.appendChild(innerWrapper);
 
         if(swipeMode && !heartMode && !seenItems.has(item.index)){
             seenItems.add(item.index);
@@ -521,12 +591,25 @@ function render(){
 
         if(swipeMode){
             let startX = 0;
-            wrapper.addEventListener("touchstart", e => { startX = e.touches[0].clientX; }, {passive:true});
+            let startY = 0;
+            wrapper.addEventListener("touchstart", e => { 
+                startX = e.touches[0].clientX; 
+                startY = e.touches[0].clientY; 
+            }, {passive:true});
+
             wrapper.addEventListener("touchend", e => {
-                const diff = e.changedTouches[0].clientX - startX;
-                if(Math.abs(diff) > 60){
-                    if(diff < 0) nextRandomPage();
-                    else toggleHeart(item.index);
+                const diffX = e.changedTouches[0].clientX - startX;
+                const diffY = e.changedTouches[0].clientY - startY;
+                
+                // Ensure it's a horizontal swipe rather than vertical scrolling or zooming
+                if(Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)){
+                    if(diffX < 0) {
+                        // Swipe left = Skip / No heart
+                        nextRandomPage();
+                    } else {
+                        // Swipe right = Heart + Auto advance
+                        toggleHeart(item.index, true);
+                    }
                 }
             }, {passive:true});
         }
@@ -561,7 +644,7 @@ function nextRandomPage(){
 }
 
 /* ==========================================================
-    INITIALIZE
+   INITIALIZE
 ========================================================== */
 async function initializeApp(){
     try {
