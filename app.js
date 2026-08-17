@@ -131,23 +131,18 @@ async function manualSyncToGitHub(){
 }
 
 /* ==========================================================
-   CLEAR BUTTON FUNCTIONALITY (Secured / Double Confirmation)
+   CLEAR BUTTON FUNCTIONALITY (Simplified Confirmation)
 ========================================================== */
 async function confirmClearData() {
     const firstCheck = confirm("⚠️ DANGER: Are you sure you want to completely reset seen_media.json and saved_hearts.json?");
     if(!firstCheck) return;
-
-    const secondCheck = prompt("Type 'RESET' below to confirm clearing all data:");
-    if(secondCheck !== "RESET") {
-        alert("Reset cancelled.");
-        return;
-    }
 
     seenItems.clear();
     heartedItems.clear();
     updateStats();
     await manualSyncToGitHub();
     applySearch();
+    toggleHistoryModal();
 }
 
 function saveSettings(){
@@ -206,7 +201,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA UTILS & CAMERA ROLL DOWNLOAD (iOS Enhanced)
+   MEDIA UTILS & CAMERA ROLL DOWNLOAD (iOS 1-Click Optimized)
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
@@ -224,36 +219,30 @@ function normalizeImageURL(url){
     return src;
 }
 
-async function saveToCameraRoll(url, index) {
+function saveToCameraRoll(url, index) {
     const statusEl = document.getElementById("status");
     statusEl.style.color = "#38bdf8";
-    statusEl.textContent = `📥 Preparing media #${index} for Photos...`;
+    statusEl.textContent = `📥 Opening media #${index} for saving...`;
 
     try {
         const absoluteUrl = normalizeImageURL(url);
-        const response = await fetch(absoluteUrl, { mode: 'cors' });
-        const blob = await response.blob();
         const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
 
-        // Create an Object URL download link optimized for iOS Safari
-        const blobUrl = URL.createObjectURL(blob);
+        // Reliable 1-click download trick for mobile Safari
         const a = document.createElement('a');
-        a.href = blobUrl;
+        a.href = absoluteUrl;
+        a.target = '_blank';
         a.download = `media_${index}.${fileExtension}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
 
-        // Clean up object URL after a brief delay
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-
         statusEl.style.color = "#10b981";
-        statusEl.textContent = `✅ Saved! Check your Downloads/Photos.`;
-        setTimeout(() => { statusEl.textContent = ""; }, 3500);
+        statusEl.textContent = `✅ Opened! Long-press image/video to save to Photos.`;
+        setTimeout(() => { statusEl.textContent = ""; }, 4000);
     } catch (err) {
-        // Fallback: open directly in a new tab if CORS or direct fetch fails
         window.open(normalizeImageURL(url), '_blank');
-        statusEl.style.color = "";
+        statusEl.textContent = "";
     }
 }
 
@@ -605,11 +594,11 @@ function render(){
 
                 // Horizontal swipe detection
                 if(Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)){
-                    if(diffX < 0) {
-                        // Swipe LEFT = Heart + Auto advance
+                    if(diffX > 0) {
+                        // Swipe RIGHT = Heart + Auto advance
                         toggleHeart(item.index, true);
                     } else {
-                        // Swipe RIGHT = Skip / Next Media
+                        // Swipe LEFT = Skip / Next Media
                         nextRandomPage();
                     }
                 }
