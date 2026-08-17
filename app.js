@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==========================================================
-   GITHUB SYNC
+   GITHUB SYNC & INITIALIZATION
 ========================================================== */
 async function fetchGitHubFile(path) {
     try {
@@ -103,6 +103,32 @@ async function saveGitHubFile(path, dataArray) {
     if(!res.ok) throw new Error(`Failed to save ${path}`);
 }
 
+async function initializeApp() {
+    const statusEl = document.getElementById("status");
+    statusEl.style.color = "#38bdf8";
+    statusEl.textContent = "⏳ Loading mediaNEW.json...";
+
+    // Fetch media links from mediaNEW.json instead of media_urls.json
+    const mediaRes = await fetchGitHubFile("mediaNEW.json");
+    if(!mediaRes || !Array.isArray(mediaRes.content)){
+        statusEl.style.color = "#f87171";
+        statusEl.textContent = "❌ Failed to load mediaNEW.json from GitHub repository";
+        return;
+    }
+
+    // Map content to standard format with indices
+    mediaUrls = mediaRes.content.map((item, idx) => {
+        if(typeof item === "string") return { index: idx + 1, url: item };
+        return { index: item.index || (idx + 1), url: item.url || item };
+    });
+
+    await loadServerData();
+    shuffleArray(mediaUrls);
+    applySearch();
+    showWelcome();
+    statusEl.textContent = "";
+}
+
 async function loadServerData(){
     const heartsRes = await fetchGitHubFile("saved_hearts.json");
     if(heartsRes && Array.isArray(heartsRes.content)) heartedItems = new Set(heartsRes.content);
@@ -131,7 +157,7 @@ async function manualSyncToGitHub(){
 }
 
 /* ==========================================================
-   CLEAR BUTTON FUNCTIONALITY
+   CLEAR & SETTINGS
 ========================================================== */
 async function confirmClearData() {
     if(confirm("Are you sure you want to reset seen_media.json and saved_hearts.json?")) {
@@ -140,7 +166,6 @@ async function confirmClearData() {
         updateStats();
         await manualSyncToGitHub();
         applySearch();
-        toggleHistoryModal();
     }
 }
 
@@ -200,7 +225,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-   MEDIA UTILS & DIRECT 1-TAP CAMERA ROLL DOWNLOAD
+   MEDIA UTILS & CAMERA ROLL DOWNLOAD
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
@@ -221,29 +246,34 @@ function normalizeImageURL(url){
 async function saveToCameraRoll(url, index) {
     const statusEl = document.getElementById("status");
     statusEl.style.color = "#38bdf8";
-    statusEl.textContent = `📥 Saving media #${index}...`;
+    statusEl.textContent = `📥 Preparing media #${index}...`;
 
     try {
         const absoluteUrl = normalizeImageURL(url);
         const response = await fetch(absoluteUrl, { mode: 'cors' });
         const blob = await response.blob();
         const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
-        
-        // Direct zero-friction blob download for mobile
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `media_${index}.${fileExtension}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        const file = new File([blob], `media_${index}.${fileExtension}`, { type: blob.type });
 
-        statusEl.style.color = "#10b981";
-        statusEl.textContent = `✅ Saved directly to Photos/Downloads!`;
-        setTimeout(() => { statusEl.textContent = ""; }, 3000);
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: `Media #${index}`,
+            });
+            statusEl.textContent = "";
+        } else {
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `media_${index}.${fileExtension}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            statusEl.style.color = "#10b981";
+            statusEl.textContent = `✅ Saved! Check your downloads/photos.`;
+            setTimeout(() => { statusEl.textContent = ""; }, 3000);
+        }
     } catch (err) {
-        // Fallback open if cross-origin blocks fetch
         window.open(normalizeImageURL(url), '_blank');
         statusEl.textContent = "";
     }
@@ -282,7 +312,7 @@ function shuffleArray(array){
 }
 
 /* ==========================================================
-   SEARCH
+   SEARCH & NAVIGATION
 ========================================================== */
 function applySearch(){
     workingList = buildDisplayList();
@@ -309,6 +339,18 @@ function buildDisplayList(){
         list = list.filter(item => !seenItems.has(item.index));
     }
     return list;
+}
+
+function nextRandomPage(){
+    if(currentIndex < workingList.length) {
+        render();
+        snapToTop();
+    } else {
+        shuffleArray(workingList);
+        currentIndex = 0;
+        render();
+        snapToTop();
+    }
 }
 
 /* ==========================================================
@@ -485,57 +527,8 @@ function setupObserver(){
 }
 
 /* ==========================================================
-   SWIPE GESTURE SUPPORT (Swipe Right = Heart + Next, Swipe Left = Skip)
-========================================================== */
-function attachSwipeHandlers(wrapper, currentItemIndex) {
-    let startX = 0;
-    let startY = 0;
-
-    wrapper.addEventListener("touchstart", (e) => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    }, { passive: true });
-
-    wrapper.addEventListener("touchend", (e) => {
-        if (!swipeMode) return;
-        const endX = e.changedTouches[0].clientX;
-        const endY = e.changedTouches[0].clientY;
-
-        const diffX = endX - startX;
-        const diffY = endY - startY;
-
-        // Ensure horizontal swipe is dominant over vertical scroll
-        if (Math.abs(diffX) > 70 && Math.abs(diffX) > Math.abs(diffY)) {
-            if (diffX > 0) {
-                // Swipe Right: Heart & Next
-                toggleHeart(currentItemIndex, false);
-                nextRandomPage();
-            } else {
-                // Swipe Left: Skip (just next)
-                nextRandomPage();
-            }
-        }
-    }, { passive: true });
-}
-
-/* ==========================================================
    RENDER
 ========================================================== */
-function nextRandomPage(){
-    if(workingList.length === 0) return;
-    if(swipeMode){
-        currentIndex++;
-        if(currentIndex >= workingList.length) {
-            currentIndex = 0;
-            shuffleArray(workingList);
-        }
-        render();
-        snapToTop();
-    } else {
-        window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' });
-    }
-}
-
 function render(){
     updateStats();
     preloadUpcoming();
@@ -557,10 +550,6 @@ function render(){
         wrapper.className = "media-container";
         wrapper.dataset.index = item.index;
 
-        if (swipeMode) {
-            attachSwipeHandlers(wrapper, item.index);
-        }
-
         const numEl = document.createElement("div");
         numEl.className = "media-number";
         numEl.id = `num-${item.index}`;
@@ -574,7 +563,7 @@ function render(){
         }
         wrapper.appendChild(numEl);
 
-        // Actions Row (Heart + 1-Tap Camera Roll Save Button)
+        // Actions Row (Heart + Camera Roll Save Button)
         const actionsRow = document.createElement("div");
         actionsRow.className = "media-actions-row";
 
@@ -615,46 +604,25 @@ function render(){
             media.loading = "eager";
             media.decoding = "async";
             media.setAttribute("fetchpriority", "high");
+        } else {
+            media = document.createElement("img");
+            media.src = normalizeImageURL(item.url);
         }
 
-        if(media){
-            media.addEventListener("click", () => {
-                const now = Date.now();
-                if(now - lastTap < 300) handleDoubleTap(item.index, wrapper);
-                lastTap = now;
-            });
-            innerWrapper.appendChild(media);
-        }
+        media.addEventListener("click", (e) => {
+            const now = new Date().getTime();
+            if(now - lastTap < 300) {
+                handleDoubleTap(item.index, wrapper);
+            }
+            lastTap = now;
+        });
+
+        innerWrapper.appendChild(media);
         wrapper.appendChild(innerWrapper);
-
         container.appendChild(wrapper);
+
         shown++;
     }
 
-    if(!swipeMode){
-        setupObserver();
-    }
-}
-
-async function initializeApp(){
-    const statusEl = document.getElementById("status");
-    statusEl.style.color = "#38bdf8";
-    statusEl.textContent = "📂 Loading media links...";
-
-    try {
-        const mediaRes = await fetchGitHubFile("mediaNEW.json");
-        if(mediaRes && Array.isArray(mediaRes.content)){
-            mediaUrls = mediaRes.content.map((url, idx) => ({ index: idx + 1, url }));
-            shuffleArray(mediaUrls);
-            await loadServerData();
-            applySearch();
-            showWelcome();
-        } else {
-            statusEl.style.color = "#f87171";
-            statusEl.textContent = "❌ Failed to load mediaNEW.json";
-        }
-    } catch(e) {
-        statusEl.style.color = "#f87171";
-        statusEl.textContent = "❌ Error initializing app";
-    }
+    setupObserver();
 }
