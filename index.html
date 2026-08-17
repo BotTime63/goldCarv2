@@ -240,7 +240,7 @@ html, body {
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 24px;
-    padding: 8px 10px;
+    padding: 8px 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -401,7 +401,7 @@ html, body {
 
 <div id="welcomeBanner">
     🌙 <b>Night Edition V7 Active</b><br><br>
-    Smart iPhone 11 layout with safe clear button inside history, left-to-heart gestures, and direct camera roll save.
+    Smart iPhone 11 layout with hidden Clear button, fast timers, camera roll save, and smooth swipe gestures.
 </div>
 
 <!-- History Modal -->
@@ -409,17 +409,12 @@ html, body {
     <div style="max-width:450px; margin:0 auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #222; padding-bottom:12px;">
             <h3 style="margin:0; font-size:16px;">🕒 Recently Viewed History</h3>
-            <button onclick="toggleHistoryModal()" style="background:#222; color:#fff; border:none; padding:6px 12px; border-radius:8px; cursor:pointer;">Close ✕</button>
+            <div style="display:flex; gap: 8px;">
+                <button onclick="confirmClearData()" style="background:rgba(248, 113, 113, 0.15); color:#f87171; border:1px solid rgba(248, 113, 113, 0.3); padding:6px 12px; border-radius:8px; cursor:pointer; font-weight:600;">🗑️ Clear Data</button>
+                <button onclick="toggleHistoryModal()" style="background:#222; color:#fff; border:none; padding:6px 12px; border-radius:8px; cursor:pointer;">Close ✕</button>
+            </div>
         </div>
-
         <div id="historyListContainer"></div>
-
-        <!-- Safe Clear Data Area at the Very Bottom of History -->
-        <div style="background:#141416; padding:16px; border-radius:12px; margin-top:25px; border:1px solid rgba(248,113,113,0.2); text-align:center;">
-            <div style="font-size:13px; font-weight:bold; color:#f87171; margin-bottom:4px;">⚠️ Danger Zone</div>
-            <div style="font-size:11px; color:#888; margin-bottom:12px;">Resetting will clear all saved hearts and seen records on GitHub.</div>
-            <button onclick="confirmClearData()" style="background:rgba(248,113,113,0.15); color:#f87171; border:1px solid rgba(248,113,113,0.4); padding:10px 20px; border-radius:10px; font-size:12px; font-weight:bold; cursor:pointer; width:100%;">Reset / Clear All Data</button>
-        </div>
     </div>
 </div>
 
@@ -459,7 +454,7 @@ html, body {
         </button>
 
         <button class="dock-btn" onclick="toggleHistoryModal()">
-            <span class="icon">🕒</span>
+            <span class="icon" id="historyIcon">🕒</span>
             <span>History</span>
         </button>
 
