@@ -110,7 +110,11 @@ async function saveGitHubFile(path, dataArray) {
 }
 
 async function loadServerData(){
-    const heartsRes = await fetchGitHubFile("saved_hearts.json");
+    // Check saved_hearts.json first, fallback to hearts.json if needed
+    let heartsRes = await fetchGitHubFile("saved_hearts.json");
+    if(!heartsRes || !Array.isArray(heartsRes.content)) {
+        heartsRes = await fetchGitHubFile("hearts.json");
+    }
     if(heartsRes && Array.isArray(heartsRes.content)) heartedItems = new Set(heartsRes.content);
 
     const seenRes = await fetchGitHubFile("seen_media.json");
@@ -241,7 +245,6 @@ async function saveToCameraRoll(url, index) {
         const fileExtension = isVideo(url) ? 'mp4' : 'jpg';
         const blobUrl = URL.createObjectURL(blob);
         
-        // Zero-friction direct download trigger for mobile web / PWA
         const a = document.createElement('a');
         a.href = blobUrl;
         a.download = `media_${index}.${fileExtension}`;
@@ -253,7 +256,6 @@ async function saveToCameraRoll(url, index) {
         statusEl.textContent = `✅ Saved to Photos!`;
         setTimeout(() => { statusEl.textContent = ""; }, 2500);
     } catch (err) {
-        // Fallback to direct window open if cross-origin blocks blob fetch
         window.open(normalizeImageURL(url), '_blank');
         statusEl.textContent = "";
     }
@@ -432,7 +434,6 @@ function handleSwipeGesture(itemIndex) {
     const diffX = touchEndX - touchStartX;
     const diffY = touchEndY - touchStartY;
     
-    // Ensure horizontal swipe is dominant and exceeds threshold (70px)
     if (Math.abs(diffX) > 70 && Math.abs(diffX) > Math.abs(diffY)) {
         if (diffX > 0) {
             // SWIPE RIGHT: Heart + Advance
@@ -441,7 +442,7 @@ function handleSwipeGesture(itemIndex) {
             }
             nextRandomPage();
         } else {
-            // SWIPE LEFT: Skip + Advance (no heart)
+            // SWIPE LEFT: Skip + Advance
             nextRandomPage();
         }
     }
@@ -553,7 +554,6 @@ function render(){
         wrapper.className = "media-container";
         wrapper.dataset.index = item.index;
 
-        // Attach Swipe Gesture Listeners if Swipe Mode is Active
         if(swipeMode){
             wrapper.addEventListener("touchstart", handleTouchStart, {passive: true});
             wrapper.addEventListener("touchend", (e) => handleTouchEnd(e, item.index), {passive: true});
@@ -572,7 +572,6 @@ function render(){
         }
         wrapper.appendChild(numEl);
 
-        // Actions Row (Heart + One-Tap Camera Roll Save Button)
         const actionsRow = document.createElement("div");
         actionsRow.className = "media-actions-row";
 
@@ -650,7 +649,7 @@ async function initializeApp(){
     statusEl.style.color = "#38bdf8";
     statusEl.textContent = "⏳ Loading media list from GitHub...";
 
-    const mediaRes = await fetchGitHubFile("media_urls.json");
+    const mediaRes = await fetchGitHubFile("mediaNEW.json");
     if(mediaRes && Array.isArray(mediaRes.content)){
         mediaUrls = mediaRes.content.map((url, idx) => ({ index: idx + 1, url }));
         shuffleArray(mediaUrls);
@@ -661,6 +660,6 @@ async function initializeApp(){
         statusEl.textContent = "";
     } else {
         statusEl.style.color = "#f87171";
-        statusEl.textContent = "❌ Failed to load media_urls.json from GitHub";
+        statusEl.textContent = "❌ Failed to load mediaNEW.json from GitHub";
     }
 }
