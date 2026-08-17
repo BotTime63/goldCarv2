@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
 
-<title>Media Viewer - Night Edition V8</title>
+<title>Media Viewer - Right-Handed Edition V8</title>
 
 <style>
 * {
@@ -149,7 +149,7 @@ html, body {
     color: #ff2d55;
 }
 
-/* Save to Camera Roll Button (One-Tap Direct) */
+/* Save to Camera Roll Button */
 .save-camera-btn {
     background: rgba(56, 189, 248, 0.1);
     border: 1px solid rgba(56, 189, 248, 0.3);
@@ -227,7 +227,7 @@ html, body {
     100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
 }
 
-/* RIGHT-HAND THUMB DOCK (Optimized for One-Handed iPhone 11 Use) */
+/* RIGHT-HAND THUMB DOCK (Prioritizing right side thumb reach) */
 .thumb-dock {
     position: fixed;
     bottom: 16px;
@@ -240,7 +240,7 @@ html, body {
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 24px;
-    padding: 8px 12px;
+    padding: 8px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -252,20 +252,20 @@ html, body {
     background: transparent;
     border: none;
     color: #ccc;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
     cursor: pointer;
-    padding: 6px 8px;
+    padding: 4px 6px;
     border-radius: 12px;
     transition: all 0.15s ease;
 }
 
 .dock-btn span.icon {
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .dock-btn:active {
@@ -276,18 +276,28 @@ html, body {
     color: #ff2d55;
 }
 
+.autoplay-select {
+    background: #1a1a1e;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-size: 9px;
+    padding: 2px;
+    outline: none;
+}
+
 /* Primary Thumb Action Button (Rightmost / Easiest Thumb Reach) */
 .dock-primary {
     background: linear-gradient(135deg, #9333ea, #c084fc);
     color: #fff;
     border: none;
-    width: 50px;
-    height: 50px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 20px;
+    font-size: 18px;
     box-shadow: 0 4px 15px rgba(147, 51, 234, 0.5);
     cursor: pointer;
     transition: transform 0.15s ease;
@@ -297,8 +307,8 @@ html, body {
     transform: scale(0.88);
 }
 
-/* History Modal & Settings Menu Modal */
-#historyModal, #settingsModal {
+/* Modals */
+.modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.96);
@@ -321,7 +331,25 @@ html, body {
     background: #1c1c1f;
 }
 
-/* Welcome / Status / Login */
+/* Settings Menu Modal */
+.settings-menu-box {
+    background: #141416;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 20px;
+    max-width: 360px;
+    margin: 40px auto;
+}
+.settings-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 14px;
+}
+
+/* Welcome / Login */
 #welcomeBanner {
     position: fixed;
     top: 60px;
@@ -390,12 +418,12 @@ html, body {
 <body>
 
 <div id="welcomeBanner">
-    🌙 <b>Night Edition V8 Active</b><br><br>
-    Right-handed ergonomics, one-tap photo saves, smooth swipe gestures, and secured settings menu.
+    🌙 <b>Right-Handed Edition V8 Active</b><br><br>
+    Optimized thumb reach, frictionless camera save, smooth swipe controls, and hidden settings.
 </div>
 
 <!-- History Modal -->
-<div id="historyModal" class="hidden">
+<div id="historyModal" class="modal-overlay hidden">
     <div style="max-width:450px; margin:0 auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #222; padding-bottom:12px;">
             <h3 style="margin:0; font-size:16px;">🕒 Recently Viewed History</h3>
@@ -405,43 +433,23 @@ html, body {
     </div>
 </div>
 
-<!-- Settings & Advanced Options Modal -->
-<div id="settingsModal" class="hidden">
-    <div style="max-width:400px; margin:40px auto; background:#121215; padding:20px; border-radius:16px; border:1px solid rgba(255,255,255,0.1);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #222; padding-bottom:10px;">
-            <h3 style="margin:0; font-size:16px;">⚙️ Settings & Controls</h3>
+<!-- Settings & Clear Data Modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="settings-menu-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #222; padding-bottom:12px;">
+            <h3 style="margin:0; font-size:16px;">⚙️ Settings & Actions</h3>
             <button onclick="toggleSettingsModal()" style="background:#222; color:#fff; border:none; padding:6px 12px; border-radius:8px; cursor:pointer;">Close ✕</button>
         </div>
-        
-        <div style="margin-bottom: 20px;">
-            <label style="font-size:12px; color:#aaa; display:block; margin-bottom:6px;">Auto-Play Speed</label>
-            <select id="autoPlaySpeed" style="width:100%; background:#1c1c21; color:#fff; border:1px solid #333; border-radius:8px; padding:10px; font-size:13px;" onchange="changeAutoPlaySpeed(this.value)">
-                <option value="600">0.6s</option>
-                <option value="1000">1.0s</option>
-                <option value="1500">1.5s</option>
-                <option value="2500" selected>2.5s (Default)</option>
-                <option value="4000">4s</option>
-                <option value="6000">6s</option>
-            </select>
+        <div class="settings-option">
+            <span>💾 Manual GitHub Sync</span>
+            <button onclick="manualSyncToGitHub()" style="background:#38bdf8; color:#000; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">Sync</button>
         </div>
-
-        <div style="margin-bottom: 16px;">
-            <button onclick="toggleAutoPlay(); toggleSettingsModal();" id="autoPlayMenuBtn" style="width:100%; background:#1c1c21; color:#38bdf8; border:1px solid #333; padding:12px; border-radius:10px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span id="autoPlayIconMenu">▶️</span> <span id="autoPlayTextMenu">Start Auto-Play</span>
-            </button>
-        </div>
-
-        <div style="margin-bottom: 16px;">
-            <button onclick="manualSyncToGitHub(); toggleSettingsModal();" style="width:100%; background:rgba(56,189,248,0.1); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:12px; border-radius:10px; font-weight:600; cursor:pointer;">
-                💾 Sync Data to GitHub
-            </button>
-        </div>
-
-        <div style="border-top:1px solid #222; padding-top:16px; margin-top:16px;">
-            <button onclick="confirmClearData()" style="width:100%; background:rgba(248,113,113,0.15); color:#f87171; border:1px solid rgba(248,113,113,0.3); padding:12px; border-radius:10px; font-weight:600; cursor:pointer;">
-                🗑️ Clear Seen & Hearts Data
-            </button>
-            <div style="font-size:10px; color:#666; text-align:center; margin-top:6px;">Resets progress files on GitHub. Protected behind confirmation.</div>
+        <div class="settings-option" style="border-bottom: none;">
+            <div>
+                <div style="color:#f87171; font-weight:bold;">🗑️ Reset Data</div>
+                <div style="font-size:11px; color:#777;">Clears seen & hearted records</div>
+            </div>
+            <button onclick="confirmClearData()" style="background:#f87171; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">Clear</button>
         </div>
     </div>
 </div>
@@ -476,14 +484,14 @@ html, body {
 
     <!-- Right-Hand Optimized Thumb Dock -->
     <div class="thumb-dock">
-        <button class="dock-btn" onclick="toggleHistoryModal()">
-            <span class="icon">🕒</span>
-            <span>History</span>
-        </button>
-
         <button class="dock-btn" id="heartModeBtn" onclick="showHeartedOnly()">
             <span class="icon" id="heartModeIcon">♡</span>
             <span>Hearts</span>
+        </button>
+
+        <button class="dock-btn" onclick="toggleHistoryModal()">
+            <span class="icon">🕒</span>
+            <span>History</span>
         </button>
 
         <button class="dock-btn" id="swipeModeBtn" onclick="toggleSwipeMode()">
@@ -491,12 +499,28 @@ html, body {
             <span>Swipe</span>
         </button>
 
+        <button class="dock-btn" onclick="toggleAutoPlay()">
+            <span class="icon" id="autoPlayIcon">▶️</span>
+            <span id="autoPlayText">Auto</span>
+        </button>
+
+        <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <select id="autoPlaySpeed" class="autoplay-select" onchange="changeAutoPlaySpeed(this.value)">
+                <option value="600">0.6s</option>
+                <option value="1000">1.0s</option>
+                <option value="1500">1.5s</option>
+                <option value="2500" selected>2.5s</option>
+                <option value="4000">4s</option>
+                <option value="6000">6s</option>
+            </select>
+        </div>
+
         <button class="dock-btn" onclick="toggleSettingsModal()">
             <span class="icon">⚙️</span>
             <span>Menu</span>
         </button>
 
-        <!-- Primary Thumb Action Button -->
+        <!-- Main Thumb Action Button (Rightmost / Easy Thumb Reach) -->
         <button class="dock-primary" onclick="nextRandomPage()" title="Next / Random">🎲</button>
     </div>
 </div>
