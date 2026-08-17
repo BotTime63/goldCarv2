@@ -1,5 +1,5 @@
 /* ==========================================================
-    APP.JS - Night Edition (Right-Hand Thumb Optimized)
+    APP.JS - Night Edition V5 (Turbocharged & Fully Refined)
 ========================================================== */
 
 const GITHUB_CONFIG = {
@@ -16,6 +16,8 @@ let workingList = [];
 let currentIndex = 0;
 let searchTimer = null;
 let recentHistory = [];
+let observer = null;
+let observerTimeout = null;
 
 const STORAGE = {
     heartMode: "mediaViewerHeartMode",
@@ -27,6 +29,11 @@ let seenItems = new Set();
 let heartedItems = new Set();
 let heartMode = localStorage.getItem(STORAGE.heartMode) === "true";
 let swipeMode = localStorage.getItem(STORAGE.swipeMode) === "true";
+
+// Auto Play State
+let autoPlayActive = false;
+let autoPlayTimer = null;
+let autoPlayInterval = 2500;
 
 /* ==========================================================
     INIT & AUTH
@@ -77,7 +84,7 @@ async function saveGitHubFile(path, dataArray) {
     const url = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${path}`;
     const existing = await fetchGitHubFile(path);
     const sha = existing ? existing.sha : undefined;
-
+    
     const jsonString = JSON.stringify(dataArray, null, 2);
     const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
 
@@ -142,7 +149,6 @@ function updateStats(){
     if(seenEl) seenEl.textContent = `${seen}/${total}`;
     if(heartsEl) heartsEl.textContent = hearts;
 
-    // Update Dock Button States
     const heartBtn = document.getElementById("heartModeBtn");
     const heartIcon = document.getElementById("heartModeIcon");
     if(heartBtn && heartIcon){
@@ -159,6 +165,13 @@ function updateStats(){
     if(swipeBtn){
         swipeBtn.style.color = swipeMode ? "#c084fc" : "#ccc";
     }
+
+    const autoIcon = document.getElementById("autoPlayIcon");
+    const autoText = document.getElementById("autoPlayText");
+    if(autoIcon && autoText){
+        autoIcon.textContent = autoPlayActive ? "⏸️" : "▶️";
+        autoText.textContent = autoPlayActive ? "Stop" : "Auto";
+    }
 }
 
 function showWelcome(){
@@ -173,7 +186,7 @@ function showWelcome(){
 }
 
 /* ==========================================================
-    MEDIA UTILS
+    MEDIA UTILS & TURBO PRELOADING
 ========================================================== */
 function isImage(url){
     return /\.(jpeg|jpg|png|gif|webp|heic|avif|bmp)$/i.test(url) || url.includes("pbs.twimg.com");
@@ -192,7 +205,8 @@ function normalizeImageURL(url){
 }
 
 function preloadUpcoming(){
-    for(let i = currentIndex; i < Math.min(currentIndex + 3, workingList.length); i++){
+    // Turbocharged preloading: Preload the next 8 items ahead in background for zero lag
+    for(let i = currentIndex; i < Math.min(currentIndex + 8, workingList.length); i++){
         const item = workingList[i];
         if(item && isImage(item.url)){
             const img = new Image();
@@ -202,12 +216,16 @@ function preloadUpcoming(){
 }
 
 function snapToTop(){
-    const activeWrapper = document.querySelector(".media-container");
-    if(activeWrapper){
-        const topPos = activeWrapper.getBoundingClientRect().top + window.pageYOffset - 50;
-        window.scrollTo({ top: Math.max(0, topPos), behavior: "smooth" });
+    if(swipeMode){
+        const activeWrapper = document.querySelector(".media-container");
+        if(activeWrapper){
+            const topPos = activeWrapper.getBoundingClientRect().top + window.pageYOffset - 12;
+            window.scrollTo({ top: Math.max(0, topPos), behavior: "smooth" });
+        } else {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
     } else {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "instant" });
     }
 }
 
@@ -250,6 +268,42 @@ function buildDisplayList(){
 }
 
 /* ==========================================================
+    AUTO PLAY SYSTEM
+========================================================== */
+function toggleAutoPlay(){
+    autoPlayActive = !autoPlayActive;
+    if(autoPlayActive){
+        if(!swipeMode){
+            swipeMode = true;
+            saveSettings();
+            currentIndex = 0;
+            render();
+        }
+        startAutoPlay();
+    } else {
+        stopAutoPlay();
+    }
+    updateStats();
+}
+
+function startAutoPlay(){
+    stopAutoPlay();
+    autoPlayTimer = setInterval(() => {
+        nextRandomPage();
+    }, autoPlayInterval);
+}
+
+function stopAutoPlay(){
+    if(autoPlayTimer) clearInterval(autoPlayTimer);
+    autoPlayTimer = null;
+}
+
+function changeAutoPlaySpeed(val){
+    autoPlayInterval = Number(val);
+    if(autoPlayActive) startAutoPlay();
+}
+
+/* ==========================================================
     HEARTS & INTERACTIONS
 ========================================================== */
 function toggleHeart(index){
@@ -258,8 +312,13 @@ function toggleHeart(index){
 
     updateStats();
 
-    document.querySelectorAll(`.heart-toggle-${index}`).forEach(el => {
-        el.textContent = heartedItems.has(index) ? "❤️" : "♡";
+    document.querySelectorAll(".heart-btn").forEach(btn => {
+        if(Number(btn.dataset.index) === index){
+            const active = heartedItems.has(index);
+            btn.textContent = active ? "❤️" : "♡";
+            if(active) btn.classList.add("active");
+            else btn.classList.remove("active");
+        }
     });
 
     if(heartMode && !heartedItems.has(index)) applySearch();
@@ -290,13 +349,14 @@ function showHeartedOnly(){
 function toggleSwipeMode(){
     swipeMode = !swipeMode;
     saveSettings();
+    if(autoPlayActive && !swipeMode) toggleAutoPlay();
     currentIndex = 0;
     render();
     snapToTop();
 }
 
 /* ==========================================================
-    HISTORY DRAWER
+    HISTORY DRAWER WITH THUMBNAILS
 ========================================================== */
 function addToHistory(item){
     recentHistory = recentHistory.filter(i => i.index !== item.index);
@@ -316,13 +376,18 @@ function renderHistory(){
         container.innerHTML = '<p style="color:#555; text-align:center;">No history yet</p>';
         return;
     }
-    container.innerHTML = recentHistory.map(item => `
-        <div class="history-item" onclick="jumpToHistory(${item.index})">
-            <div style="font-weight:bold; margin-right:12px; min-width:45px; color:#aaa;">#${item.index}</div>
-            <div style="font-size:11px; color:#666; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.url}</div>
-            <div>${heartedItems.has(item.index) ? "❤️" : ""}</div>
-        </div>
-    `).join("");
+    container.innerHTML = recentHistory.map(item => {
+        const thumb = normalizeImageURL(item.url);
+        const hasImg = isImage(item.url);
+        return `
+            <div class="history-item" onclick="jumpToHistory(${item.index})">
+                ${hasImg ? `<img src="${thumb}" style="width:40px; height:40px; object-fit:cover; border-radius:6px; margin-right:12px; background:#000;" onerror="this.style.display='none'">` : `<div style="width:40px; height:40px; background:#222; border-radius:6px; margin-right:12px; display:flex; align-items:center; justify-content:center; font-size:16px;">🎬</div>`}
+                <div style="font-weight:bold; margin-right:12px; min-width:45px; color:#aaa;">#${item.index}</div>
+                <div style="font-size:11px; color:#666; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.url}</div>
+                <div>${heartedItems.has(item.index) ? "❤️" : ""}</div>
+            </div>
+        `;
+    }).join("");
 }
 
 function jumpToHistory(index){
@@ -335,6 +400,41 @@ function jumpToHistory(index){
     }
     render();
     snapToTop();
+}
+
+/* ==========================================================
+    INTERSECTION OBSERVER (SEEN BADGE POP)
+========================================================== */
+function setupObserver(){
+    if(observer) observer.disconnect();
+    if(observerTimeout) clearTimeout(observerTimeout);
+
+    observerTimeout = setTimeout(() => {
+        observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting){
+                    const index = Number(entry.target.dataset.index);
+                    if(index && !heartMode && !seenItems.has(index)){
+                        seenItems.add(index);
+                        updateStats();
+
+                        const numberEl = document.getElementById(`num-${index}`);
+                        if(numberEl && !numberEl.querySelector(".seen-badge")) {
+                            const badge = document.createElement("span");
+                            badge.className = "seen-badge";
+                            badge.textContent = "👀 Seen";
+                            numberEl.appendChild(badge);
+                        }
+                        obs.unobserve(entry.target);
+                    }
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll(".media-container").forEach(wrapper => {
+            observer.observe(wrapper);
+        });
+    }, 1000);
 }
 
 /* ==========================================================
@@ -359,11 +459,27 @@ function render(){
 
         const wrapper = document.createElement("div");
         wrapper.className = "media-container";
+        wrapper.dataset.index = item.index;
 
         const numEl = document.createElement("div");
         numEl.className = "media-number";
-        numEl.innerHTML = `#${item.index} ${(!heartMode && seenItems.has(item.index)) ? '<span class="seen-badge">Seen</span>' : ''}`;
+        numEl.id = `num-${item.index}`;
+        numEl.textContent = `#${item.index}`;
+
+        if(!heartMode && seenItems.has(item.index)){
+            const badge = document.createElement("span");
+            badge.className = "seen-badge";
+            badge.textContent = "👀 Seen";
+            numEl.appendChild(badge);
+        }
         wrapper.appendChild(numEl);
+
+        const heartBtn = document.createElement("button");
+        heartBtn.className = `heart-btn ${heartedItems.has(item.index) ? 'active' : ''}`;
+        heartBtn.dataset.index = item.index;
+        heartBtn.textContent = heartedItems.has(item.index) ? "❤️" : "♡";
+        heartBtn.onclick = () => toggleHeart(item.index);
+        wrapper.appendChild(heartBtn);
 
         const link = document.createElement("a");
         link.href = item.url;
@@ -377,10 +493,13 @@ function render(){
             media.src = item.url;
             media.controls = true;
             media.playsInline = true;
+            media.preload = "auto";
         } else if(isImage(item.url)){
             media = document.createElement("img");
             media.src = normalizeImageURL(item.url);
             media.loading = "eager";
+            media.decoding = "async";
+            media.setAttribute("fetchpriority", "high");
         }
 
         if(media){
@@ -392,10 +511,14 @@ function render(){
             wrapper.appendChild(media);
         }
 
-        // Swipe mode instant seen tracking
+        // Swipe mode instant seen tracking & badge
         if(swipeMode && !heartMode && !seenItems.has(item.index)){
             seenItems.add(item.index);
             updateStats();
+            const badge = document.createElement("span");
+            badge.className = "seen-badge";
+            badge.textContent = "👀 Seen";
+            numEl.appendChild(badge);
         }
 
         // Swipe gestures
@@ -413,6 +536,10 @@ function render(){
 
         container.appendChild(wrapper);
         shown++;
+    }
+
+    if(!swipeMode){
+        setupObserver();
     }
 }
 
@@ -444,7 +571,7 @@ async function initializeApp(){
         const res = await fetch("mediaNEW.json?t=" + Date.now());
         if(!res.ok) throw new Error("Failed to load mediaNEW.json");
         const data = await res.json();
-
+        
         mediaUrls = data.map((url, i) => ({ url, index: i + 1 }));
         await loadServerData();
         showWelcome();
