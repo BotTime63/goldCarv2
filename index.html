@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Media Viewer">
 
-<title>Media Viewer - Night Edition V5</title>
+<title>Media Viewer - Night Edition V6</title>
 
 <style>
 * {
@@ -195,14 +195,14 @@ html, body {
     bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
-    width: 92%;
-    max-width: 420px;
-    background: rgba(18, 18, 22, 0.9);
+    width: 94%;
+    max-width: 430px;
+    background: rgba(18, 18, 22, 0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 24px;
-    padding: 10px 12px;
+    padding: 8px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -214,20 +214,20 @@ html, body {
     background: transparent;
     border: none;
     color: #ccc;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 4px 6px;
     border-radius: 12px;
     transition: all 0.15s ease;
 }
 
 .dock-btn span.icon {
-    font-size: 18px;
+    font-size: 17px;
 }
 
 .dock-btn:active {
@@ -243,8 +243,8 @@ html, body {
     color: #fff;
     border: 1px solid #333;
     border-radius: 6px;
-    font-size: 11px;
-    padding: 3px 4px;
+    font-size: 10px;
+    padding: 2px 2px;
     outline: none;
 }
 
@@ -253,13 +253,13 @@ html, body {
     background: linear-gradient(135deg, #9333ea, #c084fc);
     color: #fff;
     border: none;
-    width: 52px;
-    height: 52px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 22px;
+    font-size: 20px;
     box-shadow: 0 4px 15px rgba(147, 51, 234, 0.5);
     cursor: pointer;
     transition: transform 0.15s ease;
@@ -362,8 +362,8 @@ html, body {
 <body>
 
 <div id="welcomeBanner">
-    🌙 <b>Night Edition V5 Active</b><br><br>
-    Optimized for right thumb control. Fast preloading & auto-play active.
+    🌙 <b>Night Edition V6 Active</b><br><br>
+    Optimized for right thumb control. Sync button added back to dock.
 </div>
 
 <!-- History Modal -->
@@ -409,7 +409,7 @@ html, body {
     <div class="thumb-dock">
         <button class="dock-btn" id="heartModeBtn" onclick="showHeartedOnly()">
             <span class="icon" id="heartModeIcon">♡</span>
-            <span id="heartModeText">Hearts</span>
+            <span>Hearts</span>
         </button>
 
         <button class="dock-btn" onclick="toggleHistoryModal()">
@@ -419,7 +419,7 @@ html, body {
 
         <button class="dock-btn" id="swipeModeBtn" onclick="toggleSwipeMode()">
             <span class="icon" id="swipeModeIcon">🎴</span>
-            <span id="swipeModeText">Swipe</span>
+            <span>Swipe</span>
         </button>
 
         <button class="dock-btn" onclick="toggleAutoPlay()">
@@ -435,6 +435,11 @@ html, body {
                 <option value="6000">6s</option>
             </select>
         </div>
+
+        <button class="dock-btn" onclick="manualSyncToGitHub()" style="color:#38bdf8;">
+            <span class="icon">💾</span>
+            <span>Save</span>
+        </button>
 
         <!-- Main Thumb Action Button -->
         <button class="dock-primary" onclick="nextRandomPage()" title="Next / Random">🎲</button>
